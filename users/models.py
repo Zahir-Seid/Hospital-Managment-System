@@ -21,7 +21,7 @@ class User(AbstractUser):
 
     username = None  # Remove username
     USERNAME_FIELD = 'email'  # Use email for login
-    REQUIRED_FIELDS = []  # Remove username from required fields
+    REQUIRED_FIELDS = ['role']  # Remove username from required fields
 
     def __str__(self):
         return f"{self.email} ({self.get_role_display()})"
@@ -30,7 +30,7 @@ class User(AbstractUser):
 # Base Profile Model for Common Fields
 class BaseProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='%(class)s_profile')
-    ssn = models.CharField(max_length=20, blank=True, null=True, unique=True)
+    ssn = models.CharField(max_length=20, unique=True)
 
     class Meta:
         abstract = True
@@ -64,4 +64,4 @@ class PatientProfile(models.Model):
     region = models.CharField(max_length=50, blank=True, null=True)
     town = models.CharField(max_length=50, blank=True, null=True)
     kebele = models.CharField(max_length=50, blank=True, null=True)
-    house_number = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    house_number = models.CharField(max_length=50, blank=True, null=True)

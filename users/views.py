@@ -94,7 +94,8 @@ def update_profile(request, payload: dict):
 
     if profile:
         try:
-            update_schema = update_schema_cls(**payload)
+            update_schema = update_schema_cls.model_validate(payload)
+
 
             # Validate SSN for roles other than "patient"
             if user.role != 'patient' and not payload.get('ssn'):
@@ -123,5 +124,6 @@ def delete_profile(request):
 
     if profile:
         profile.delete()
+        #user.delete()
         return 200, {"message": "Profile deleted successfully"}
     return 404, {"error": "Profile not found"}
