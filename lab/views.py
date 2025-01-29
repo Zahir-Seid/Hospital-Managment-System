@@ -4,12 +4,13 @@ from users.models import User
 from .models import LabTest
 from .schemas import LabTestCreate, LabTestUpdate, LabTestOut
 from users.views import AuthBearer  
+from notifications.views import send_notification 
 
 lab_router = Router(tags=["Lab Tests"], auth=AuthBearer())
 
 # Doctor orders a lab test
 @lab_router.post("/order", response={200: LabTestOut, 400: dict})
-def order_lab_test(request, payload: LabTestCreate):
+async def order_lab_test(request, payload: LabTestCreate):
     """
     Doctor orders a lab test for a patient.
     """
@@ -25,6 +26,12 @@ def order_lab_test(request, payload: LabTestCreate):
         patient=patient,
         test_name=payload.test_name
     )
+
+    # Notify all lab technicians (assuming multiple exist)
+    lab_technicians = User.objects.filter(role="lab_technician")
+    for technician in lab_technicians:
+        await send_notification(technician, f"New lab test ordered: {payload.test_name} by Dr. {doctor.email}.")
+
     return lab_test
 
 
@@ -53,7 +60,7 @@ def list_lab_tests(request):
 
 # Lab Technician updates test status and result
 @lab_router.put("/update/{lab_test_id}", response={200: LabTestOut, 400: dict})
-def update_lab_test(request, lab_test_id: int, payload: LabTestUpdate):
+async def update_lab_test(request, lab_test_id: int, payload: LabTestUpdate):
     """
     Lab technicians update test results.
     """
@@ -68,4 +75,8 @@ def update_lab_test(request, lab_test_id: int, payload: LabTestUpdate):
         setattr(lab_test, attr, value)
 
     lab_test.save()
+
+    # Notify the doctor that the lab result is ready
+    await send_notification(lab_test.doctor, f"Lab result for {lab_test.test_name} is now available.")
+
     return lab_test

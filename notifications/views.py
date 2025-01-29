@@ -7,21 +7,45 @@ from users.views import AuthBearer
 
 notifications_router = Router(tags=["Notifications"], auth=AuthBearer())
 
-# Send a notification
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from django.shortcuts import get_object_or_404
+from notifications.models import Notification
+from users.models import User
+from notifications.schemas import NotificationCreate, NotificationOut
+from ninja import Router
+from users.views import AuthBearer  
+
+notifications_router = Router(tags=["Notifications"], auth=AuthBearer())
+
+# Send a notification 
 @notifications_router.post("/send", response={200: NotificationOut, 400: dict})
 def send_notification(request, payload: NotificationCreate):
     """
-    Create a notification for a user.
+    Create a notification for a user and send it in real-time via WebSockets.
     """
     sender = request.auth  # Authenticated user
     recipient = get_object_or_404(User, id=payload.recipient_id)
 
+    # Store notification in the database
     notification = Notification.objects.create(
         recipient=recipient,
         message=payload.message
     )
-    return notification
 
+    # Get WebSocket channel layer
+    channel_layer = get_channel_layer()
+
+    # Send real-time WebSocket notification
+    async_to_sync(channel_layer.group_send)(
+        f"user_{recipient.id}",
+        {
+            "type": "send_notification",
+            "message": payload.message,
+        }
+    )
+
+    return notification
 
 # List notifications for the logged-in user
 @notifications_router.get("/list", response={200: list[NotificationOut]})

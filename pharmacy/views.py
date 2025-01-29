@@ -6,17 +6,18 @@ from .schemas import (
     PrescriptionCreate, PrescriptionUpdate, PrescriptionOut,
     DrugCreate, DrugUpdate, DrugOut
 )
-from users.views import AuthBearer 
+from users.views import AuthBearer  
+from notifications.views import send_notification  # Import notification function
 
 pharmacy_router = Router(tags=["Pharmacy"], auth=AuthBearer())
 
 # Doctor creates a prescription
 @pharmacy_router.post("/prescribe", response={200: PrescriptionOut, 400: dict})
-def prescribe_medication(request, payload: PrescriptionCreate):
+async def prescribe_medication(request, payload: PrescriptionCreate):
     """
     Doctor prescribes medication to a patient.
     """
-    doctor = request.auth  # Authenticated user
+    doctor = request.auth  
 
     if doctor.role != "doctor":
         return 400, {"error": "Only doctors can prescribe medication"}
@@ -30,6 +31,12 @@ def prescribe_medication(request, payload: PrescriptionCreate):
         dosage=payload.dosage,
         instructions=payload.instructions
     )
+
+    # 🔔 Notify all pharmacists about the new prescription
+    pharmacists = User.objects.filter(role="pharmacist")
+    for pharmacist in pharmacists:
+        await send_notification(pharmacist, f"New prescription for {patient.email}: {payload.medication_name}.")
+
     return prescription
 
 
@@ -58,7 +65,7 @@ def list_prescriptions(request):
 
 # Pharmacist updates prescription status
 @pharmacy_router.put("/update/{prescription_id}", response={200: PrescriptionOut, 400: dict})
-def update_prescription(request, prescription_id: int, payload: PrescriptionUpdate):
+async def update_prescription(request, prescription_id: int, payload: PrescriptionUpdate):
     """
     Pharmacists update prescription status (mark as dispensed).
     """
@@ -73,7 +80,13 @@ def update_prescription(request, prescription_id: int, payload: PrescriptionUpda
         setattr(prescription, attr, value)
 
     prescription.save()
+
+    # 🔔 Notify the patient when the prescription is dispensed
+    if prescription.status == "dispensed":
+        await send_notification(prescription.patient, f"Your prescription for {prescription.medication_name} is ready for pickup.")
+
     return prescription
+
 
 # Pharmacist creates a new drug
 @pharmacy_router.post("/drugs/create", response={200: DrugOut, 400: dict})
@@ -81,7 +94,7 @@ def create_drug(request, payload: DrugCreate):
     """
     Pharmacist adds a new drug to inventory.
     """
-    pharmacist = request.auth  # Authenticated user
+    pharmacist = request.auth  
 
     if pharmacist.role != "pharmacist":
         return 400, {"error": "Only pharmacists can add drugs"}

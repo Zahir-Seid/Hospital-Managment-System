@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'billings',
     'notifications',
     'reports',
+    'channels', 
 ]
 
 MIDDLEWARE = [
@@ -88,6 +89,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'HospitalManagmentSystem.wsgi.application'
 
+# WebSockets Configuration
+ASGI_APPLICATION = "HospitalManagmentSystem.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
+# In Production: Change "InMemoryChannelLayer" to "channels_redis.core.RedisChannelLayer" and configure Redis properly. 
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
