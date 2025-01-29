@@ -1,4 +1,4 @@
-from ninja import NinjaAPI
+from ninja import Router
 from ninja.security import HttpBearer
 from django.contrib.auth import authenticate, login, logout
 from .models import (
@@ -13,7 +13,7 @@ from .schemas import (LoginSchema,SignupSchema,
     CashierProfileOut, CashierProfileUpdate
 )
 
-api = NinjaAPI()
+router = Router(tags=["Authentication & Profiles"])
 
 # Authentication
 class AuthBearer(HttpBearer):
@@ -23,7 +23,7 @@ class AuthBearer(HttpBearer):
 
 
 # Signup
-@api.post("/signup/", response={200: UserOut, 400: dict})
+@router.post("/signup/", response={200: UserOut, 400: dict})
 def signup(request, payload: SignupSchema):
     if User.objects.filter(email=payload.email).exists():
         return 400, {"error": "Email already exists"}
@@ -37,7 +37,7 @@ def signup(request, payload: SignupSchema):
     return 200, user # UserOut.model_validate(user)
 
 # Login
-@api.post("/login/", response={200: dict, 401: dict})
+@router.post("/login/", response={200: dict, 401: dict})
 def user_login(request, payload: LoginSchema):
     user = authenticate(request, email=payload.email, password=payload.password)
     if user:
@@ -47,7 +47,7 @@ def user_login(request, payload: LoginSchema):
 
 
 # Logout
-@api.post("/logout/", response={200: dict})
+@router.post("/logout/", response={200: dict})
 def user_logout(request):
     logout(request)
     return 200, {"message": "Logout successful"}
@@ -65,7 +65,7 @@ ROLE_TO_PROFILE_MAP = {
 
 
 # Profile CRUD
-@api.get("/profile/", response={200: dict, 404: dict}, auth=AuthBearer())
+@router.get("/profile/", response={200: dict, 404: dict}, auth=AuthBearer())
 def get_profile(request):
     user = request.auth
     role_data = ROLE_TO_PROFILE_MAP.get(user.role)
@@ -81,7 +81,7 @@ def get_profile(request):
     return 404, {"error": "Profile not found"}
 
 
-@api.put("/profile/", response={200: dict, 400: dict, 404: dict}, auth=AuthBearer())
+@router.put("/profile/", response={200: dict, 400: dict, 404: dict}, auth=AuthBearer())
 def update_profile(request, payload: dict):
     user = request.auth
     role_data = ROLE_TO_PROFILE_MAP.get(user.role)
@@ -111,7 +111,7 @@ def update_profile(request, payload: dict):
     return 404, {"error": "Profile not found"}
 
 
-@api.delete("/profile/", response={200: dict, 404: dict}, auth=AuthBearer())
+@router.delete("/profile/", response={200: dict, 404: dict}, auth=AuthBearer())
 def delete_profile(request):
     user = request.auth
     role_data = ROLE_TO_PROFILE_MAP.get(user.role)
