@@ -3,18 +3,9 @@ from django.shortcuts import get_object_or_404
 from users.models import User
 from .models import Notification
 from .schemas import NotificationCreate, NotificationOut
-from users.views import AuthBearer  
-
-notifications_router = Router(tags=["Notifications"], auth=AuthBearer())
-
+from users.auth import AuthBearer  
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from django.shortcuts import get_object_or_404
-from notifications.models import Notification
-from users.models import User
-from notifications.schemas import NotificationCreate, NotificationOut
-from ninja import Router
-from users.views import AuthBearer  
 
 notifications_router = Router(tags=["Notifications"], auth=AuthBearer())
 

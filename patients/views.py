@@ -9,26 +9,26 @@ from .schemas import (
     PatientProfileOut, MedicalHistoryOut, BillingHistoryOut, 
     AppointmentOut, LabTestOut, PrescriptionOut, InvoiceOut
 )
-from users.views import AuthBearer  
+from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.models import Notification
 from notifications.schemas import NotificationOut
 import pdfkit  
 
-patients_router = Router(tags=["Patients"], auth=AuthBearer())
+patients_router = Router(tags=["Patients"])
 
 # Get Patient Profile
-@patients_router.get("/profile", response={200: PatientProfileOut})
+@patients_router.get("/profile", response={200: PatientProfileOut}, auth=AuthBearer())
 def get_patient_profile(request):
     patient = request.auth
     if patient.role != "patient":
         return 400, {"error": "Unauthorized"}
 
     profile = get_object_or_404(PatientProfile, user=patient)
-    return PatientProfileOut.model_validate(profile).model_dump()  # ✅ Updated for Pydantic v2
+    return PatientProfileOut.model_validate(profile).model_dump()  # Updated for Pydantic v2
 
 
 # Get Medical History
-@patients_router.get("/history/medical", response={200: MedicalHistoryOut})
+@patients_router.get("/history/medical", response={200: MedicalHistoryOut}, auth=AsyncAuthBearer())
 async def get_medical_history(request):
     patient = request.auth
     if patient.role != "patient":
@@ -46,7 +46,7 @@ async def get_medical_history(request):
 
 
 # Get Billing History
-@patients_router.get("/history/billing", response={200: BillingHistoryOut})
+@patients_router.get("/history/billing", response={200: BillingHistoryOut}, auth=AsyncAuthBearer())
 async def get_billing_history(request):
     patient = request.auth
     if patient.role != "patient":
@@ -57,7 +57,7 @@ async def get_billing_history(request):
 
 
 # Get Unread Notifications
-@patients_router.get("/notifications", response={200: list[NotificationOut]})
+@patients_router.get("/notifications", response={200: list[NotificationOut]}, auth=AsyncAuthBearer())
 async def get_notifications(request):
     patient = request.auth
     if patient.role != "patient":
@@ -68,7 +68,7 @@ async def get_notifications(request):
 
 
 # Mark Notifications as Read
-@patients_router.put("/notifications/mark-read", response={200: dict})
+@patients_router.put("/notifications/mark-read", response={200: dict}, auth=AsyncAuthBearer())
 async def mark_notifications_read(request):
     patient = request.auth
     if patient.role != "patient":
@@ -79,7 +79,7 @@ async def mark_notifications_read(request):
 
 
 # Download Medical History as PDF
-@patients_router.get("/history/download", response={200: dict, 400: dict})
+@patients_router.get("/history/download", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
 async def download_medical_history(request):
     patient = request.auth
     if patient.role != "patient":

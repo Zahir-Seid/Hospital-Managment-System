@@ -6,13 +6,13 @@ from .schemas import (
     PrescriptionCreate, PrescriptionUpdate, PrescriptionOut,
     DrugCreate, DrugUpdate, DrugOut
 )
-from users.views import AuthBearer  
-from notifications.views import send_notification  # Import notification function
+from users.auth import AuthBearer, AsyncAuthBearer 
+from notifications.views import send_notification  
 
-pharmacy_router = Router(tags=["Pharmacy"], auth=AuthBearer())
+pharmacy_router = Router(tags=["Pharmacy"])
 
 # Doctor creates a prescription
-@pharmacy_router.post("/prescribe", response={200: PrescriptionOut, 400: dict})
+@pharmacy_router.post("/prescribe", response={200: PrescriptionOut, 400: dict}, auth=AsyncAuthBearer())
 async def prescribe_medication(request, payload: PrescriptionCreate):
     """
     Doctor prescribes medication to a patient.
@@ -32,7 +32,7 @@ async def prescribe_medication(request, payload: PrescriptionCreate):
         instructions=payload.instructions
     )
 
-    # 🔔 Notify all pharmacists about the new prescription
+    # Notify all pharmacists about the new prescription
     pharmacists = User.objects.filter(role="pharmacist")
     for pharmacist in pharmacists:
         await send_notification(pharmacist, f"New prescription for {patient.email}: {payload.medication_name}.")
@@ -41,7 +41,7 @@ async def prescribe_medication(request, payload: PrescriptionCreate):
 
 
 # List prescriptions (for patient, doctor, or pharmacist)
-@pharmacy_router.get("/list", response={200: list[PrescriptionOut]})
+@pharmacy_router.get("/list", response={200: list[PrescriptionOut]}, auth=AuthBearer())
 def list_prescriptions(request):
     """
     Retrieve prescriptions for the logged-in user.
@@ -64,7 +64,7 @@ def list_prescriptions(request):
 
 
 # Pharmacist updates prescription status
-@pharmacy_router.put("/update/{prescription_id}", response={200: PrescriptionOut, 400: dict})
+@pharmacy_router.put("/update/{prescription_id}", response={200: PrescriptionOut, 400: dict}, auth=AsyncAuthBearer())
 async def update_prescription(request, prescription_id: int, payload: PrescriptionUpdate):
     """
     Pharmacists update prescription status (mark as dispensed).
@@ -81,7 +81,7 @@ async def update_prescription(request, prescription_id: int, payload: Prescripti
 
     prescription.save()
 
-    # 🔔 Notify the patient when the prescription is dispensed
+    # Notify the patient when the prescription is dispensed
     if prescription.status == "dispensed":
         await send_notification(prescription.patient, f"Your prescription for {prescription.medication_name} is ready for pickup.")
 
@@ -89,7 +89,7 @@ async def update_prescription(request, prescription_id: int, payload: Prescripti
 
 
 # Pharmacist creates a new drug
-@pharmacy_router.post("/drugs/create", response={200: DrugOut, 400: dict})
+@pharmacy_router.post("/drugs/create", response={200: DrugOut, 400: dict}, auth=AuthBearer())
 def create_drug(request, payload: DrugCreate):
     """
     Pharmacist adds a new drug to inventory.
@@ -118,7 +118,7 @@ def list_drugs(request):
 
 
 # Update drug details (only pharmacist)
-@pharmacy_router.put("/drugs/update/{drug_id}", response={200: DrugOut, 400: dict})
+@pharmacy_router.put("/drugs/update/{drug_id}", response={200: DrugOut, 400: dict}, auth=AuthBearer())
 def update_drug(request, drug_id: int, payload: DrugUpdate):
     """
     Pharmacist updates drug information (stock, price, etc.).
@@ -138,7 +138,7 @@ def update_drug(request, drug_id: int, payload: DrugUpdate):
 
 
 # Delete a drug (only pharmacist)
-@pharmacy_router.delete("/drugs/delete/{drug_id}", response={200: dict, 400: dict})
+@pharmacy_router.delete("/drugs/delete/{drug_id}", response={200: dict, 400: dict}, auth=AuthBearer())
 def delete_drug(request, drug_id: int):
     """
     Pharmacist deletes a drug from inventory.

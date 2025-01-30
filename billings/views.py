@@ -3,20 +3,20 @@ from django.shortcuts import get_object_or_404
 from users.models import User
 from .models import Invoice
 from .schemas import InvoiceCreate, InvoiceUpdate, InvoiceOut
-from users.views import AuthBearer  
+from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.views import send_notification  
 import requests
 import os
 import uuid
 
-billings_router = Router(tags=["Billing"], auth=AuthBearer())
+billings_router = Router(tags=["Billing"])
 
 CHAPA_SECRET_KEY = os.getenv("CHAPA_SECRET_KEY")
 CHAPA_INIT_URL = "https://api.chapa.co/v1/transaction/initialize"
 CHAPA_VERIFY_URL = "https://api.chapa.co/v1/transaction/verify"
 
 # Create an invoice
-@billings_router.post("/create", response={200: InvoiceOut, 400: dict})
+@billings_router.post("/create", response={200: InvoiceOut, 400: dict}, auth=AsyncAuthBearer())
 async def create_invoice(request, payload: InvoiceCreate):
     # Generate a new invoice for a patient.
     user = request.auth
@@ -39,7 +39,7 @@ async def create_invoice(request, payload: InvoiceCreate):
 
 
 # Generate Chapa Payment Link
-@billings_router.post("/pay/{invoice_id}", response={200: dict, 400: dict})
+@billings_router.post("/pay/{invoice_id}", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
 async def generate_chapa_payment_link(request, invoice_id: int, phone_number: str):
     invoice = get_object_or_404(Invoice.objects.select_related("patient"), id=invoice_id, status="pending")
     tx_ref = f"invoice_{invoice.id}_{uuid.uuid4().hex[:8]}"
@@ -75,7 +75,7 @@ async def generate_chapa_payment_link(request, invoice_id: int, phone_number: st
 
 
 # List invoices for a patient
-@billings_router.get("/list", response={200: list[InvoiceOut]})
+@billings_router.get("/list", response={200: list[InvoiceOut]}, auth=AuthBearer())
 def list_invoices(request):
     #Retrieve invoices for the logged-in patient.
     user = request.auth
@@ -86,7 +86,7 @@ def list_invoices(request):
     return Invoice.objects.filter(patient=user)
 
 # Confirm Chapa Payment
-@billings_router.post("/verify/{invoice_id}", response={200: dict, 400: dict})
+@billings_router.post("/verify/{invoice_id}", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
 async def confirm_payment(request, invoice_id: int):
     invoice = get_object_or_404(Invoice.objects.select_related("patient"), id=invoice_id, status="pending")
     headers = {"Authorization": f"Bearer {CHAPA_SECRET_KEY}", "Content-Type": "application/json"}
@@ -106,7 +106,7 @@ async def confirm_payment(request, invoice_id: int):
 
 
 # Cashier approves a payment
-@billings_router.put("/approve/{invoice_id}", response={200: InvoiceOut, 400: dict})
+@billings_router.put("/approve/{invoice_id}", response={200: InvoiceOut, 400: dict}, auth=AsyncAuthBearer())
 async def approve_payment(request, invoice_id: int, payload: InvoiceUpdate):
     # Cashier manually approves a payment after confirmation.
     user = request.auth

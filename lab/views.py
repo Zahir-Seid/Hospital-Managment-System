@@ -3,13 +3,13 @@ from django.shortcuts import get_object_or_404
 from users.models import User
 from .models import LabTest
 from .schemas import LabTestCreate, LabTestUpdate, LabTestOut
-from users.views import AuthBearer  
+from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.views import send_notification 
 
-lab_router = Router(tags=["Lab Tests"], auth=AuthBearer())
+lab_router = Router(tags=["Lab Tests"])
 
 # Doctor orders a lab test
-@lab_router.post("/order", response={200: LabTestOut, 400: dict})
+@lab_router.post("/order", response={200: LabTestOut, 400: dict}, auth=AsyncAuthBearer())
 async def order_lab_test(request, payload: LabTestCreate):
     """
     Doctor orders a lab test for a patient.
@@ -36,7 +36,7 @@ async def order_lab_test(request, payload: LabTestCreate):
 
 
 # List lab tests (for patient, doctor, or lab technician)
-@lab_router.get("/list", response={200: list[LabTestOut]})
+@lab_router.get("/list", response={200: list[LabTestOut]}, auth=AuthBearer())
 def list_lab_tests(request):
     """
     Retrieve lab tests for the logged-in user.
@@ -59,7 +59,7 @@ def list_lab_tests(request):
 
 
 # Lab Technician updates test status and result
-@lab_router.put("/update/{lab_test_id}", response={200: LabTestOut, 400: dict})
+@lab_router.put("/update/{lab_test_id}", response={200: LabTestOut, 400: dict}, auth=AsyncAuthBearer())
 async def update_lab_test(request, lab_test_id: int, payload: LabTestUpdate):
     """
     Lab technicians update test results.

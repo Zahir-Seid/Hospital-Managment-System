@@ -3,14 +3,14 @@ from django.shortcuts import get_object_or_404
 from users.models import User
 from .models import Appointment
 from .schemas import AppointmentCreate, AppointmentOut, AppointmentUpdate
-from users.views import AuthBearer  
+from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.views import send_notification  
 
 # Create a router with authentication
-router = Router(tags=["Appointments"], auth=AuthBearer())
+router = Router(tags=["Appointments"])
 
 # Create an appointment
-@router.post("/create", response={200: AppointmentOut, 400: dict})
+@router.post("/create", response={200: AppointmentOut, 400: dict}, auth=AuthBearer())
 def create_appointment(request, payload: AppointmentCreate):
     """
     Create a new appointment (only for patients).
@@ -37,7 +37,7 @@ def create_appointment(request, payload: AppointmentCreate):
 
 
 # List appointments (GET)
-@router.get("/list", response={200: list[AppointmentOut]})
+@router.get("/list", response={200: list[AppointmentOut]}, auth=AuthBearer())
 def list_appointments(request):
     """
     List appointments for the logged-in user (patients see their own, doctors see theirs).
@@ -55,7 +55,7 @@ def list_appointments(request):
 
 
 # Update an appointment
-@router.put("/update/{appointment_id}", response={200: AppointmentOut, 400: dict})
+@router.put("/update/{appointment_id}", response={200: AppointmentOut, 400: dict}, auth=AsyncAuthBearer())
 async def update_appointment(request, appointment_id: int, payload: AppointmentUpdate):
     """
     Update an appointment's status or reason (only patient/doctor can update).
@@ -81,7 +81,7 @@ async def update_appointment(request, appointment_id: int, payload: AppointmentU
 
 
 # Delete an appointment
-@router.delete("/delete/{appointment_id}", response={200: dict, 400: dict})
+@router.delete("/delete/{appointment_id}", response={200: dict, 400: dict}, auth=AuthBearer())
 def delete_appointment(request, appointment_id: int):
     """
     Delete an appointment (only allowed by the patient or doctor).

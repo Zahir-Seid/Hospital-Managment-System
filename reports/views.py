@@ -13,11 +13,11 @@ import csv
 from datetime import datetime, timedelta
 from .schemas import FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut, ServiceUsageOut
 import pdfkit
-
+from users.auth import AsyncAuthBearer, AuthBearer
 reports_router = Router(tags=["Reports"])
 
 # Generate Financial Report
-@reports_router.get("/financial/summary", response={200: FinancialReportOut})
+@reports_router.get("/financial/summary", response={200: FinancialReportOut}, auth=AsyncAuthBearer())
 async def financial_summary(request, start_date: str = None, end_date: str = None):
     """
     Fetch financial summary: total revenue, pending vs. approved payments.
@@ -37,7 +37,7 @@ async def financial_summary(request, start_date: str = None, end_date: str = Non
     return FinancialReportOut(total_revenue=total_revenue, pending_payments=pending_payments)
 
 # Generate Appointments Report
-@reports_router.get("/medical/appointments", response={200: AppointmentReportOut})
+@reports_router.get("/medical/appointments", response={200: AppointmentReportOut}, auth=AsyncAuthBearer())
 async def appointments_report(request, doctor_id: int = None):
     """
     Get total appointments per doctor.
@@ -54,7 +54,7 @@ async def appointments_report(request, doctor_id: int = None):
     return AppointmentReportOut(total_appointments=total_appointments)
 
 # Generate System-Wide Report
-@reports_router.get("/system/overview", response={200: SystemReportOut})
+@reports_router.get("/system/overview", response={200: SystemReportOut}, auth=AsyncAuthBearer())
 async def system_overview(request):
     """
     Fetch system-wide statistics: active patients, unread notifications.
@@ -72,7 +72,7 @@ async def system_overview(request):
     )
 
 # Generate Most Used Services Report
-@reports_router.get("/system/most-used-services", response={200: list[ServiceUsageOut]})
+@reports_router.get("/system/most-used-services", response={200: list[ServiceUsageOut]}, auth=AsyncAuthBearer())
 async def most_used_services(request):
     """
     Fetch most used services in the hospital.
@@ -89,7 +89,7 @@ async def most_used_services(request):
     return services
 
 # Generate Chart for Most Used Services
-@reports_router.get("/system/most-used-services-chart", response={200: ChartOut})
+@reports_router.get("/system/most-used-services-chart", response={200: ChartOut}, auth=AsyncAuthBearer())
 async def most_used_services_chart(request):
     """
     Generate a pie chart for most used services.
@@ -111,7 +111,7 @@ async def most_used_services_chart(request):
     return ChartOut(chart=f"data:image/png;base64,{image_base64}")
 
 # Export Report as CSV
-@reports_router.get("/export/csv", response={200: CSVExportOut})
+@reports_router.get("/export/csv", response={200: CSVExportOut}, auth=AsyncAuthBearer())
 async def export_csv(request, report_type: str):
     """
     Export financial or medical reports as CSV.
@@ -132,7 +132,7 @@ async def export_csv(request, report_type: str):
     return CSVExportOut(csv_file=csv_data)
 
 # Export Report as PDF
-@reports_router.get("/export/pdf")
+@reports_router.get("/export/pdf", auth=AsyncAuthBearer())
 async def export_pdf(request, report_type: str):
     """
     Export financial or medical reports as PDF.
