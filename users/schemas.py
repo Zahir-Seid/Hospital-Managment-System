@@ -10,7 +10,7 @@ class UserOut(BaseModel):
     address: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Signup Schema
 class SignupSchema(BaseModel):
@@ -28,7 +28,7 @@ class ManagerProfileOut(BaseModel):
     ssn: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ManagerProfileUpdate(BaseModel):
@@ -42,7 +42,7 @@ class DoctorProfileOut(BaseModel):
     level: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class DoctorProfileUpdate(BaseModel):
@@ -59,7 +59,7 @@ class PatientProfileOut(BaseModel):
     house_number: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PatientProfileUpdate(BaseModel):
@@ -74,7 +74,7 @@ class PharmacistProfileOut(BaseModel):
     ssn: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PharmacistProfileUpdate(BaseModel):
@@ -86,7 +86,7 @@ class LabTechnicianProfileOut(BaseModel):
     ssn: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class LabTechnicianProfileUpdate(BaseModel):
@@ -98,7 +98,7 @@ class CashierProfileOut(BaseModel):
     ssn: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CashierProfileUpdate(BaseModel):
