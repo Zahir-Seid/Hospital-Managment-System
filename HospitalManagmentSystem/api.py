@@ -5,6 +5,7 @@ from lab.views import lab_router
 from pharmacy.views import pharmacy_router
 from notifications.views import notifications_router
 from billings.views import billings_router
+from patients.views import patients_router
 
 api = NinjaAPI(title="Hospital Management API")
 
@@ -15,3 +16,4 @@ api.add_router("/lab", lab_router)
 api.add_router("/pharmacy", pharmacy_router)
 api.add_router("/notifications", notifications_router)
 api.add_router("/billings", billings_router)
+api.add_router("/patients", patients_router)
