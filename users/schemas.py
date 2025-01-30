@@ -16,7 +16,7 @@ class UserOut(BaseModel):
 class SignupSchema(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
-    role: str = Field(..., pattern="^(manager|doctor|patient|pharmacist|lab_technician|cashier|record_officer)$")
+    role: str = Field(..., pattern="^(doctor|patient|pharmacist|lab_technician|cashier|record_officer)$")
 
 # Login schema
 class LoginSchema(BaseModel):

@@ -1,4 +1,7 @@
 from ninja import NinjaAPI
+from ninja_jwt.routers.blacklist import blacklist_router
+from ninja_jwt.routers.obtain import obtain_pair_router, sliding_router
+from ninja_jwt.routers.verify import verify_router
 from users.views import router as user_router
 from appointments.views import router as appointment_router
 from lab.views import lab_router
@@ -19,3 +22,9 @@ api.add_router("/notifications", notifications_router)
 api.add_router("/billings", billings_router)
 api.add_router("/patients", patients_router)
 api.add_router("/reports", reports_router)
+
+# Token Management
+api.add_router('/token', obtain_pair_router)  # Generates access & refresh tokens
+api.add_router("/token/refresh", sliding_router)  # Added missing refresh token router
+api.add_router("/token/verify", verify_router)  # Verify access tokens
+api.add_router("/token/blacklist", blacklist_router)  # Blacklist refresh tokens

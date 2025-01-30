@@ -18,7 +18,7 @@ class User(AbstractUser):
     gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female')], blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(unique=True)
-
+    is_active = models.BooleanField(default=True)
     username = None  # Remove username
     USERNAME_FIELD = 'email'  # Use email for login
     REQUIRED_FIELDS = ['role']  # Remove username from required fields
