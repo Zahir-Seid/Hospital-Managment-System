@@ -25,11 +25,11 @@ def signup(request, payload: SignupSchema):
     Patients can sign up but require approval.
     Employees must be created by a manager.
     """
-    if User.objects.filter(email=payload.email).aexists():
-        return 400, {"error": "Email already exists"}
+    if User.objects.filter(username=payload.username).aexists():
+        return 400, {"error": "username already exists"}
 
     user = User.objects.acreate(
-        email=payload.email,
+        username=payload.username,
         password=make_password(payload.password),
         role="patient",
         is_active=False  # Patients require approval
@@ -38,7 +38,7 @@ def signup(request, payload: SignupSchema):
     # Notify Record Officers
     record_officers = User.objects.filter(role="record_officer").all()
     for officer in record_officers:
-        send_notification(officer, f"New patient registration pending approval: {user.email}")
+        send_notification(officer, f"New patient registration pending approval: {user.username}")
 
     return {"message": "Registration successful. Awaiting approval by a record officer."}
 
@@ -50,7 +50,7 @@ def user_login(request, payload: LoginSchema):
     """
     Login using JWT authentication. Returns access and refresh tokens.
     """
-    user = User.objects.filter(email=payload.email).afirst()
+    user = User.objects.filter(username=payload.username).afirst()
     if not user or not user.check_password(payload.password):
         return 401, {"error": "Invalid credentials"}
 
@@ -107,11 +107,11 @@ async def create_employee(request, payload: SignupSchema):
     if payload.role == "manager":
         return 400, {"error": "Managers cannot create other managers."}
 
-    if await User.objects.filter(email=payload.email).aexists():
-        return 400, {"error": "Email already exists"}
+    if await User.objects.filter(username=payload.username).aexists():
+        return 400, {"error": "username already exists"}
 
     user = await User.objects.acreate(
-        email=payload.email,
+        username=payload.username,
         password=make_password(payload.password),
         role=payload.role,
         is_active=True  # Employees are active immediately

@@ -6,6 +6,7 @@ class UserOut(BaseModel):
     id: int
     phone_number: str
     email: EmailStr
+    username: str
     role: str
     address: str
 
@@ -15,12 +16,13 @@ class UserOut(BaseModel):
 # Signup Schema
 class SignupSchema(BaseModel):
     email: EmailStr
+    username: str
     password: str = Field(..., min_length=8, max_length=128)
     role: str = Field(..., pattern="^(doctor|patient|pharmacist|lab_technician|cashier|record_officer)$")
 
 # Login schema
 class LoginSchema(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 # Manager Profile Schemas

@@ -19,12 +19,9 @@ class User(AbstractUser):
     date_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
-    username = None  # Remove username
-    USERNAME_FIELD = 'email'  # Use email for login
-    REQUIRED_FIELDS = ['role']  # Remove username from required fields
 
     def __str__(self):
-        return f"{self.email} ({self.get_role_display()})"
+        return f"{self.username} ({self.get_role_display()})"
 
 
 # Base Profile Model for Common Fields
