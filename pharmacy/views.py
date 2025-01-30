@@ -136,6 +136,21 @@ def update_drug(request, drug_id: int, payload: DrugUpdate):
     drug.save()
     return drug
 
+# Search for a drug by name
+@pharmacy_router.get("/drugs/search", response={200: list[DrugOut], 400: dict}, auth=AuthBearer())
+def search_drugs(request, name: str):
+    """
+    Pharmacist searches for drugs by name.
+    """
+    if request.auth.role != "pharmacist":
+        return 400, {"error": "not allowed"}
+
+    drugs = Drug.objects.filter(name__icontains=name)
+    
+    if not drugs.exists():
+        return 400, {"error": "No matching drugs found; please report to manager to add it"}
+
+    return drugs
 
 # Delete a drug (only pharmacist)
 @pharmacy_router.delete("/drugs/delete/{drug_id}", response={200: dict, 400: dict}, auth=AuthBearer())
