@@ -35,7 +35,7 @@ async def prescribe_medication(request, payload: PrescriptionCreate):
     # Notify all pharmacists about the new prescription
     pharmacists = User.objects.filter(role="pharmacist")
     for pharmacist in pharmacists:
-        await send_notification(pharmacist, f"New prescription for {patient.email}: {payload.medication_name}.")
+        await send_notification(pharmacist, f"New prescription for {patient.username}: {payload.medication_name}.")
 
     return prescription
 

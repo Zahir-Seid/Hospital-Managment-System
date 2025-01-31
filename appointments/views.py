@@ -31,7 +31,7 @@ def create_appointment(request, payload: AppointmentCreate):
     )
 
     #  Send real-time notification to the doctor
-    send_notification(doctor, f"New appointment request from {patient.email} on {payload.date} at {payload.time}.")
+    send_notification(doctor, f"New appointment request from {patient.username} on {payload.date} at {payload.time}.")
 
     return appointment  
 

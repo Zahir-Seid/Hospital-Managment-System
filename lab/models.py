@@ -17,4 +17,4 @@ class LabTest(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Test: {self.test_name} | Patient: {self.patient.email} | Status: {self.status}"
+        return f"Test: {self.test_name} | Patient: {self.patient.username} | Status: {self.status}"

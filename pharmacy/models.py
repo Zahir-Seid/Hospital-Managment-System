@@ -28,4 +28,4 @@ class Prescription(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Prescription: {self.medication_name} for {self.patient.email} | Status: {self.status}"
+        return f"Prescription: {self.medication_name} for {self.patient.username} | Status: {self.status}"

@@ -30,7 +30,7 @@ async def order_lab_test(request, payload: LabTestCreate):
     # Notify all lab technicians (assuming multiple exist)
     lab_technicians = User.objects.filter(role="lab_technician")
     for technician in lab_technicians:
-        await send_notification(technician, f"New lab test ordered: {payload.test_name} by Dr. {doctor.email}.")
+        await send_notification(technician, f"New lab test ordered: {payload.test_name} by Dr. {doctor.username}.")
 
     return lab_test
 

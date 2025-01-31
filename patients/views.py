@@ -95,7 +95,7 @@ async def download_medical_history(request):
     prescriptions = await Prescription.objects.filter(patient=patient).all()
 
     html_content = f"""
-    <h2>Medical History for {patient.email}</h2>
+    <h2>Medical History for {patient.username}</h2>
     <h3>Appointments:</h3>
     <ul>
     {''.join([f'<li>{a.date} - {a.reason}</li>' for a in appointments])}

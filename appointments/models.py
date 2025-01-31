@@ -19,4 +19,4 @@ class Appointment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Appointment between {self.patient.email} and {self.doctor.email} on {self.date} at {self.time}"
+        return f"Appointment between {self.patient.username} and {self.doctor.username} on {self.date} at {self.time}"

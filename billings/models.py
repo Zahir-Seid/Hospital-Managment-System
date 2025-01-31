@@ -18,4 +18,4 @@ class Invoice(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Invoice #{self.id} - {self.patient.email} - {self.status}"
+        return f"Invoice #{self.id} - {self.patient.username} - {self.status}"
