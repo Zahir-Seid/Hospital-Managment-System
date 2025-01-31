@@ -61,5 +61,21 @@ class BillingHistoryOut(BaseModel):
 class PatientCommentCreate(BaseModel):
     message: str = Field(..., min_length=5, max_length=500)
 
+# Schema for Creating a Referral
+class PatientReferralCreate(BaseModel):
+    patient_id: int
+    referred_to_id: int
+    reason: str
 
+# Schema for Viewing Referrals
+class PatientReferralOut(BaseModel):
+    id: int
+    doctor: str
+    patient: str
+    referred_to: str
+    reason: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 

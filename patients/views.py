@@ -7,16 +7,16 @@ from pharmacy.models import Prescription
 from billings.models import Invoice
 from .schemas import (
     PatientProfileOut, MedicalHistoryOut, BillingHistoryOut, 
-    AppointmentOut, LabTestOut, PrescriptionOut, InvoiceOut
+    AppointmentOut, LabTestOut, PrescriptionOut, InvoiceOut, PatientCommentCreate, PatientReferralCreate, PatientReferralOut
 )
 from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.models import Notification
 from notifications.schemas import NotificationOut
 from notifications.views import send_notification
-from .models import PatientComment
-from .schemas import PatientCommentCreate
+from .models import PatientComment, PatientReferral
 from users.models import User
 import pdfkit  
+from django.utils.timezone import now
 
 patients_router = Router(tags=["Patients"])
 
@@ -137,3 +137,44 @@ async def submit_comment(request, payload: PatientCommentCreate):
         await send_notification(manager, "New patient comment received.")
 
     return {"message": "Comment submitted successfully"}
+
+# Doctor Refers a Patient
+@patients_router.post("/refer", response={200: PatientReferralOut, 400: dict}, auth=AuthBearer())
+def refer_patient(request, payload: PatientReferralCreate):
+    """
+    Doctor refers a patient to another doctor.
+    """
+    doctor = request.auth
+
+    if doctor.role != "doctor":
+        return 400, {"error": "Only doctors can refer patients"}
+
+    patient = get_object_or_404(User, id=payload.patient_id, role="patient")
+    referred_doctor = get_object_or_404(User, id=payload.referred_to_id, role="doctor")
+
+    referral = PatientReferral.objects.create(
+        doctor=doctor,
+        patient=patient,
+        referred_to=referred_doctor,
+        reason=payload.reason,
+        created_at=now(),
+    )
+
+    # Notify the referred doctor
+    send_notification(referred_doctor, f"You have received a patient referral from Dr. {doctor.username}.")
+
+    return referral
+
+# View Referrals for a Doctor
+@patients_router.get("/referrals", response={200: list[PatientReferralOut]}, auth=AuthBearer())
+def view_referrals(request):
+    """
+    Doctors view the referrals they received.
+    """
+    doctor = request.auth
+
+    if doctor.role != "doctor":
+        return 400, {"error": "Only doctors can view referrals"}
+
+    referrals = PatientReferral.objects.filter(referred_to=doctor)
+    return referrals
