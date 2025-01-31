@@ -7,16 +7,17 @@ from pharmacy.models import Prescription
 from billings.models import Invoice
 from .schemas import (
     PatientProfileOut, MedicalHistoryOut, BillingHistoryOut, 
-    AppointmentOut, LabTestOut, PrescriptionOut, InvoiceOut, PatientCommentCreate, PatientReferralCreate, PatientReferralOut
+    AppointmentOut, LabTestOut, PrescriptionOut, InvoiceOut, PatientCommentCreate, PatientReferralCreate, PatientReferralOut, ChatMessageCreate, ChatMessageOut
 )
 from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.models import Notification
 from notifications.schemas import NotificationOut
 from notifications.views import send_notification
-from .models import PatientComment, PatientReferral
+from .models import PatientComment, PatientReferral, ChatMessage
 from users.models import User
 import pdfkit  
 from django.utils.timezone import now
+from django.db import models
 
 patients_router = Router(tags=["Patients"])
 
@@ -178,3 +179,39 @@ def view_referrals(request):
 
     referrals = PatientReferral.objects.filter(referred_to=doctor)
     return referrals
+'''
+@patients_router.post("/send-message", response={200: ChatMessageOut, 400: dict}, auth=AsyncAuthBearer)
+async def send_message(request, payload: ChatMessageCreate):
+    """
+    Send a chat message via HTTP instead of WebSockets.
+    """
+    sender = request.auth
+    receiver = await User.objects.filter(id=payload.receiver_id).afirst()
+
+    if not receiver:
+        return 400, {"error": "Receiver not found"}
+
+    # Save message
+    chat_message = await ChatMessage.objects.acreate(
+        sender=sender,
+        receiver=receiver,
+        message=payload.message
+    )
+
+    return chat_message
+'''
+# Get Chat History
+@patients_router.get("/chat/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
+def get_chat_history(request, receiver_id: int):
+    """
+    Fetch chat history between the logged-in user and another user (doctor or patient).
+    """
+    user = request.auth
+    receiver = get_object_or_404(User, id=receiver_id)
+
+    messages = ChatMessage.objects.filter(
+        (models.Q(sender=user) & models.Q(receiver=receiver))
+        | (models.Q(sender=receiver) & models.Q(receiver=user))
+    ).order_by("timestamp")
+
+    return messages

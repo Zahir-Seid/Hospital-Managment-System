@@ -20,3 +20,13 @@ class PatientReferral(models.Model):
 
     def __str__(self):
         return f"Referral: {self.patient.username} -> {self.referred_to.username} ({self.created_at})"
+
+# Chat Message Model
+class ChatMessage(models.Model):
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_messages")
+    message = models.TextField()
+    timestamp = models.DateTimeField(default=now)
+
+    def __str__(self):
+        return f"Message from {self.sender.username} to {self.receiver.username} at {self.timestamp}"

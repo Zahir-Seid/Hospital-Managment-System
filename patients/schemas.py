@@ -79,3 +79,18 @@ class PatientReferralOut(BaseModel):
     class Config:
         from_attributes = True
 
+# Schema for Sending a Message
+class ChatMessageCreate(BaseModel):
+    receiver_id: int
+    message: str
+
+# Schema for Viewing Messages
+class ChatMessageOut(BaseModel):
+    id: int
+    sender: str
+    receiver: str
+    message: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True

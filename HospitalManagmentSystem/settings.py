@@ -95,8 +95,19 @@ ASGI_APPLICATION = "HospitalManagmentSystem.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
+
     },
 }
+'''
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",  # for Redis
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],  # Ensure Redis is running
+        },
+    },
+}
+'''
 # In Production: Change "InMemoryChannelLayer" to "channels_redis.core.RedisChannelLayer" and configure Redis properly. 
 
 # Database
