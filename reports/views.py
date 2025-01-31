@@ -11,11 +11,13 @@ import io
 import base64
 import csv
 from datetime import datetime, timedelta
-from .schemas import FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut, ServiceUsageOut
+from .schemas import FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut, ServiceUsageOut, EmployeeAttendanceCreate, EmployeeAttendanceOut, ServicePriceCreate, ServicePriceOut
+from .models import EmployeeAttendance, ServicePrice
 import pdfkit
-from users.auth import AsyncAuthBearer
-from .models import PatientComment
+from users.auth import AsyncAuthBearer, AuthBearer
+from patients.models import PatientComment
 from .schemas import PatientCommentOut
+from django.utils.timezone import now
 
 reports_router = Router(tags=["Reports"])
 
@@ -178,3 +180,56 @@ async def get_patient_comments(request):
 
     comments = await PatientComment.objects.all().order_by("-created_at")
     return [PatientCommentOut.model_validate(c).model_dump() for c in comments]
+
+# Employees Mark Their Own Attendance
+@reports_router.post("/attendance", response={200: EmployeeAttendanceOut, 400: dict}, auth=AuthBearer())
+def mark_own_attendance(request, payload: EmployeeAttendanceCreate):
+    """
+    Employees mark their own attendance. Each employee can only mark once per day.
+    """
+    employee = request.auth  # Get authenticated user
+
+    # Prevent duplicate attendance entry for the same day
+    if EmployeeAttendance.objects.filter(employee=employee, date=now().date()).exists():
+        return 400, {"error": "Attendance already marked for today"}
+
+    attendance = EmployeeAttendance.objects.create(employee=employee, status=payload.status)
+    return attendance
+
+# Managers View All Employee Attendance Records
+@reports_router.get("/attendance", response={200: list[EmployeeAttendanceOut]}, auth=AuthBearer())
+def view_attendance(request):
+    """
+    Managers view all employee attendance records.
+    """
+    if request.auth.role != "manager":
+        return 400, {"error": "Only managers can view attendance records"}
+
+    return [
+        EmployeeAttendanceOut(
+            id=a.id, employee_id=a.employee.id, employee_name=a.employee.username, date=a.date, status=a.status
+        ) for a in EmployeeAttendance.objects.all()
+    ]
+
+# Add/Update Hospital Service Prices
+@reports_router.post("/services", response={200: ServicePriceOut, 400: dict}, auth=AuthBearer)
+def add_service_price(request, payload: ServicePriceCreate):
+    """
+    Manager adds or updates the price of a hospital service.
+    """
+    if request.auth.role != "manager":
+        return 400, {"error": "Only managers can manage service prices"}
+
+    service, created = ServicePrice.objects.update_or_create(
+        service_name=payload.service_name,
+        defaults={"price": payload.price}
+    )
+    return service
+
+# View Hospital Service Prices
+@reports_router.get("/services", response={200: list[ServicePriceOut]})
+def view_service_prices(request):
+    """
+    View all hospital service prices.
+    """
+    return ServicePrice.objects.all()

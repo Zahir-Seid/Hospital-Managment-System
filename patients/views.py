@@ -13,7 +13,7 @@ from users.auth import AuthBearer, AsyncAuthBearer
 from notifications.models import Notification
 from notifications.schemas import NotificationOut
 from notifications.views import send_notification
-from reports.models import PatientComment
+from .models import PatientComment
 from .schemas import PatientCommentCreate
 from users.models import User
 import pdfkit  
@@ -114,7 +114,7 @@ async def download_medical_history(request):
 
     return {"message": "PDF generated", "file_path": pdf_file}
 
-# ✅ Submit a Patient Comment
+# Submit a Patient Comment
 @patients_router.post("/comment", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
 async def submit_comment(request, payload: PatientCommentCreate):
     """

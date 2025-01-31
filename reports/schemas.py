@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List
-from datetime import datetime
+from datetime import datetime, date
 
 # Financial Report Schema
 class FinancialReportOut(BaseModel):
@@ -36,6 +36,34 @@ class PatientCommentOut(BaseModel):
     patient_id: int
     message: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Schema for Marking Attendance
+class EmployeeAttendanceCreate(BaseModel):
+    status: str = Field(..., pattern="^(present|absent)$")
+
+# Schema for Viewing Attendance
+class EmployeeAttendanceOut(BaseModel):
+    id: int
+    employee_id: int
+    employee_name: str
+    date: date
+    status: str
+
+    class Config:
+        from_attributes = True
+
+# Service Price List Schema
+class ServicePriceCreate(BaseModel):
+    service_name: str
+    price: float
+
+class ServicePriceOut(BaseModel):
+    id: int
+    service_name: str
+    price: float
 
     class Config:
         from_attributes = True
