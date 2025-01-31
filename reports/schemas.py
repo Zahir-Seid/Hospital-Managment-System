@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List
+from datetime import datetime
 
 # Financial Report Schema
 class FinancialReportOut(BaseModel):
@@ -28,3 +29,13 @@ class SystemReportOut(BaseModel):
     active_patients: int
     most_used_services: List[ServiceUsageOut]
     unread_notifications: int
+
+# Patient Comment Schema
+class PatientCommentOut(BaseModel):
+    id: int
+    patient_id: int
+    message: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

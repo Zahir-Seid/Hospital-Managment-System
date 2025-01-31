@@ -12,6 +12,10 @@ from .schemas import (
 from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.models import Notification
 from notifications.schemas import NotificationOut
+from notifications.views import send_notification
+from reports.models import PatientComment
+from .schemas import PatientCommentCreate
+from users.models import User
 import pdfkit  
 
 patients_router = Router(tags=["Patients"])
@@ -109,3 +113,27 @@ async def download_medical_history(request):
     pdfkit.from_string(html_content, pdf_file)
 
     return {"message": "PDF generated", "file_path": pdf_file}
+
+# ✅ Submit a Patient Comment
+@patients_router.post("/comment", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
+async def submit_comment(request, payload: PatientCommentCreate):
+    """
+    Patients can submit feedback about the hospital.
+    The comment is sent to the manager for review.
+    """
+    patient = request.auth
+    if patient.role != "patient":
+        return 400, {"error": "Only patients can submit comments"}
+
+    # Save the comment in the reports app
+    comment = await PatientComment.objects.acreate(
+        patient=patient,
+        message=payload.message
+    )
+
+    # Notify all managers
+    managers = await User.objects.filter(role="manager").all()
+    for manager in managers:
+        await send_notification(manager, "New patient comment received.")
+
+    return {"message": "Comment submitted successfully"}

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from users.schemas import PatientProfileOut  
@@ -56,3 +56,10 @@ class MedicalHistoryOut(BaseModel):
 # Billing History Response Schema
 class BillingHistoryOut(BaseModel):
     invoices: List[InvoiceOut]
+
+# Patient Comment Schema
+class PatientCommentCreate(BaseModel):
+    message: str = Field(..., min_length=5, max_length=500)
+
+
+

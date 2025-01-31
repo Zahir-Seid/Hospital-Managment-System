@@ -13,7 +13,10 @@ import csv
 from datetime import datetime, timedelta
 from .schemas import FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut, ServiceUsageOut
 import pdfkit
-from users.auth import AsyncAuthBearer, AuthBearer
+from users.auth import AsyncAuthBearer
+from .models import PatientComment
+from .schemas import PatientCommentOut
+
 reports_router = Router(tags=["Reports"])
 
 # Generate Financial Report
@@ -162,3 +165,16 @@ async def notify_admin(report_name):
     admin_users = await User.objects.filter(role="admin").all()
     for admin in admin_users:
         await send_notification(admin, f"{report_name} report has been generated.")
+
+
+# Get Patient Comments (Managers Only)
+@reports_router.get("/patient-comments", response={200: list[PatientCommentOut]}, auth=AsyncAuthBearer())
+async def get_patient_comments(request):
+    """
+    Retrieve all patient comments (only for managers).
+    """
+    if request.auth.role != "manager":
+        return {"error": "Unauthorized"}
+
+    comments = await PatientComment.objects.all().order_by("-created_at")
+    return [PatientCommentOut.model_validate(c).model_dump() for c in comments]
