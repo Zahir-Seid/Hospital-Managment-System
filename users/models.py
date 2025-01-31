@@ -57,8 +57,10 @@ class CashierProfile(BaseProfile):
 
 # Patient Profile (Separate as it doesn’t need SSN)
 class PatientProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient_profile')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="patient_profile")
     region = models.CharField(max_length=50, blank=True, null=True)
     town = models.CharField(max_length=50, blank=True, null=True)
     kebele = models.CharField(max_length=50, blank=True, null=True)
     house_number = models.CharField(max_length=50, blank=True, null=True)
+    room_number = models.CharField(max_length=10, blank=True, null=True, unique=True)
+

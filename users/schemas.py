@@ -59,9 +59,11 @@ class PatientProfileOut(BaseModel):
     town: str
     kebele: str
     house_number: str
+    room_number: str 
 
     class Config:
         from_attributes = True
+
 
 
 class PatientProfileUpdate(BaseModel):

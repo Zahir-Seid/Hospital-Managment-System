@@ -94,3 +94,7 @@ class ChatMessageOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class RoomAssignmentSchema(BaseModel):
+    patient_id: int
+    room_number: str

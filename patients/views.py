@@ -6,15 +6,15 @@ from lab.models import LabTest
 from pharmacy.models import Prescription
 from billings.models import Invoice
 from .schemas import (
-    PatientProfileOut, MedicalHistoryOut, BillingHistoryOut, 
-    AppointmentOut, LabTestOut, PrescriptionOut, InvoiceOut, PatientCommentCreate, PatientReferralCreate, PatientReferralOut, ChatMessageCreate, ChatMessageOut
+    PatientProfileOut, MedicalHistoryOut, BillingHistoryOut, RoomAssignmentSchema, AppointmentOut, LabTestOut, PrescriptionOut,
+    InvoiceOut, PatientCommentCreate, PatientReferralCreate, PatientReferralOut, ChatMessageCreate, ChatMessageOut
 )
 from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.models import Notification
 from notifications.schemas import NotificationOut
 from notifications.views import send_notification
 from .models import PatientComment, PatientReferral, ChatMessage
-from users.models import User
+from users.models import User, PatientProfile
 import pdfkit  
 from django.utils.timezone import now
 from django.db import models
@@ -179,6 +179,28 @@ def view_referrals(request):
 
     referrals = PatientReferral.objects.filter(referred_to=doctor)
     return referrals
+
+@patients_router.put("/assign-room", response={200: dict, 400: dict}, auth=AuthBearer())
+def assign_room(request, payload: RoomAssignmentSchema):
+    """
+    Assign a room to a patient (Only Record Officers can do this).
+    """
+    user = request.auth
+
+    if user.role != "record_officer":
+        return 400, {"error": "Only record officers can assign rooms"}
+
+    patient_profile = get_object_or_404(PatientProfile, user_id=payload.patient_id)
+
+    # Ensure room number is unique
+    if PatientProfile.objects.filter(room_number=payload.room_number).exists():
+        return 400, {"error": "Room number already assigned"}
+
+    patient_profile.room_number = payload.room_number
+    patient_profile.save()
+
+    return {"message": f"Room {payload.room_number} assigned to patient {patient_profile.user.username}"}
+
 '''
 @patients_router.post("/send-message", response={200: ChatMessageOut, 400: dict}, auth=AsyncAuthBearer)
 async def send_message(request, payload: ChatMessageCreate):
@@ -200,6 +222,7 @@ async def send_message(request, payload: ChatMessageCreate):
 
     return chat_message
 '''
+
 # Get Chat History
 @patients_router.get("/chat/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
 def get_chat_history(request, receiver_id: int):
