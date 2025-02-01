@@ -67,3 +67,23 @@ class ServicePriceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+from pydantic import BaseModel
+from datetime import datetime
+
+class MessageCreate(BaseModel):
+    receiver_id: int
+    subject: str
+    message: str
+
+class MessageOut(BaseModel):
+    id: int
+    sender: str
+    receiver: str
+    subject: str
+    message: str
+    timestamp: datetime
+    is_read: bool
+
+    class Config:
+        from_attributes = True

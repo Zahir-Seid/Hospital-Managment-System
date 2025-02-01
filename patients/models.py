@@ -3,12 +3,20 @@ from users.models import User
 from django.utils.timezone import now
 
 class PatientComment(models.Model):
-    patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
+    patient = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="comments")
     message = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ["-created_at"]  # Newest comments first
+        verbose_name = "Patient Comment"
+        verbose_name_plural = "Patient Comments"
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]
+
     def __str__(self):
-        return f"Comment by {self.patient.username} on {self.created_at}"
+        return f"Comment by {self.patient.username if self.patient else 'Deleted User'} on {self.created_at}"
 
 # Patient Referral Model
 class PatientReferral(models.Model):

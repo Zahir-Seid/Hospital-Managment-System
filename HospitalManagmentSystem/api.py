@@ -9,7 +9,7 @@ from pharmacy.views import pharmacy_router
 from notifications.views import notifications_router
 from billings.views import billings_router
 from patients.views import patients_router
-from reports.views import reports_router
+from managment.views import managment_router
 
 api = NinjaAPI(title="Hospital Management API")
 
@@ -21,7 +21,7 @@ api.add_router("/pharmacy", pharmacy_router)
 api.add_router("/notifications", notifications_router)
 api.add_router("/billings", billings_router)
 api.add_router("/patients", patients_router)
-api.add_router("/reports", reports_router)
+api.add_router("/Managment", managment_router)
 
 # Token Management
 api.add_router('/token', obtain_pair_router)  # Generates access & refresh tokens

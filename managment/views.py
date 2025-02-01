@@ -4,6 +4,7 @@ from appointments.models import Appointment
 from lab.models import LabTest
 from pharmacy.models import Prescription
 from users.models import User
+from users.schemas import UserOut
 from notifications.models import Notification
 from notifications.views import send_notification
 import matplotlib.pyplot as plt
@@ -11,18 +12,19 @@ import io
 import base64
 import csv
 from datetime import datetime, timedelta
-from .schemas import FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut, ServiceUsageOut, EmployeeAttendanceCreate, EmployeeAttendanceOut, ServicePriceCreate, ServicePriceOut
-from .models import EmployeeAttendance, ServicePrice
+from .schemas import FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut, ServiceUsageOut, EmployeeAttendanceCreate, EmployeeAttendanceOut, ServicePriceCreate, ServicePriceOut, MessageCreate, MessageOut
+from .models import EmployeeAttendance, ServicePrice, ManagerMessage
 import pdfkit
 from users.auth import AsyncAuthBearer, AuthBearer
 from patients.models import PatientComment
 from .schemas import PatientCommentOut
 from django.utils.timezone import now
+from django.shortcuts import get_object_or_404
 
-reports_router = Router(tags=["Reports"])
+managment_router = Router(tags=["Managment & Reports"])
 
 # Generate Financial Report
-@reports_router.get("/financial/summary", response={200: FinancialReportOut}, auth=AsyncAuthBearer())
+@managment_router.get("/financial/summary", response={200: FinancialReportOut}, auth=AsyncAuthBearer())
 async def financial_summary(request, start_date: str = None, end_date: str = None):
     """
     Fetch financial summary: total revenue, pending vs. approved payments.
@@ -42,7 +44,7 @@ async def financial_summary(request, start_date: str = None, end_date: str = Non
     return FinancialReportOut(total_revenue=total_revenue, pending_payments=pending_payments)
 
 # Generate Appointments Report
-@reports_router.get("/medical/appointments", response={200: AppointmentReportOut}, auth=AsyncAuthBearer())
+@managment_router.get("/medical/appointments", response={200: AppointmentReportOut}, auth=AsyncAuthBearer())
 async def appointments_report(request, doctor_id: int = None):
     """
     Get total appointments per doctor.
@@ -59,7 +61,7 @@ async def appointments_report(request, doctor_id: int = None):
     return AppointmentReportOut(total_appointments=total_appointments)
 
 # Generate System-Wide Report
-@reports_router.get("/system/overview", response={200: SystemReportOut}, auth=AsyncAuthBearer())
+@managment_router.get("/system/overview", response={200: SystemReportOut}, auth=AsyncAuthBearer())
 async def system_overview(request):
     """
     Fetch system-wide statistics: active patients, unread notifications.
@@ -77,7 +79,7 @@ async def system_overview(request):
     )
 
 # Generate Most Used Services Report
-@reports_router.get("/system/most-used-services", response={200: list[ServiceUsageOut]}, auth=AsyncAuthBearer())
+@managment_router.get("/system/most-used-services", response={200: list[ServiceUsageOut]}, auth=AsyncAuthBearer())
 async def most_used_services(request):
     """
     Fetch most used services in the hospital.
@@ -94,7 +96,7 @@ async def most_used_services(request):
     return services
 
 # Generate Chart for Most Used Services
-@reports_router.get("/system/most-used-services-chart", response={200: ChartOut}, auth=AsyncAuthBearer())
+@managment_router.get("/system/most-used-services-chart", response={200: ChartOut}, auth=AsyncAuthBearer())
 async def most_used_services_chart(request):
     """
     Generate a pie chart for most used services.
@@ -116,7 +118,7 @@ async def most_used_services_chart(request):
     return ChartOut(chart=f"data:image/png;base64,{image_base64}")
 
 # Export Report as CSV
-@reports_router.get("/export/csv", response={200: CSVExportOut}, auth=AsyncAuthBearer())
+@managment_router.get("/export/csv", response={200: CSVExportOut}, auth=AsyncAuthBearer())
 async def export_csv(request, report_type: str):
     """
     Export financial or medical reports as CSV.
@@ -137,7 +139,7 @@ async def export_csv(request, report_type: str):
     return CSVExportOut(csv_file=csv_data)
 
 # Export Report as PDF
-@reports_router.get("/export/pdf", auth=AsyncAuthBearer())
+@managment_router.get("/export/pdf", auth=AsyncAuthBearer())
 async def export_pdf(request, report_type: str):
     """
     Export financial or medical reports as PDF.
@@ -170,7 +172,7 @@ async def notify_admin(report_name):
 
 
 # Get Patient Comments (Managers Only)
-@reports_router.get("/patient-comments", response={200: list[PatientCommentOut]}, auth=AsyncAuthBearer())
+@managment_router.get("/patient-comments", response={200: list[PatientCommentOut]}, auth=AsyncAuthBearer())
 async def get_patient_comments(request):
     """
     Retrieve all patient comments (only for managers).
@@ -182,7 +184,7 @@ async def get_patient_comments(request):
     return [PatientCommentOut.model_validate(c).model_dump() for c in comments]
 
 # Employees Mark Their Own Attendance
-@reports_router.post("/attendance", response={200: EmployeeAttendanceOut, 400: dict}, auth=AuthBearer())
+@managment_router.post("/attendance", response={200: EmployeeAttendanceOut, 400: dict}, auth=AuthBearer())
 def mark_own_attendance(request, payload: EmployeeAttendanceCreate):
     """
     Employees mark their own attendance. Each employee can only mark once per day.
@@ -197,7 +199,7 @@ def mark_own_attendance(request, payload: EmployeeAttendanceCreate):
     return attendance
 
 # Managers View All Employee Attendance Records
-@reports_router.get("/attendance", response={200: list[EmployeeAttendanceOut]}, auth=AuthBearer())
+@managment_router.get("/attendance", response={200: list[EmployeeAttendanceOut]}, auth=AuthBearer())
 def view_attendance(request):
     """
     Managers view all employee attendance records.
@@ -212,7 +214,7 @@ def view_attendance(request):
     ]
 
 # Add/Update Hospital Service Prices
-@reports_router.post("/services", response={200: ServicePriceOut, 400: dict}, auth=AuthBearer)
+@managment_router.post("/services", response={200: ServicePriceOut, 400: dict}, auth=AuthBearer())
 def add_service_price(request, payload: ServicePriceCreate):
     """
     Manager adds or updates the price of a hospital service.
@@ -227,9 +229,70 @@ def add_service_price(request, payload: ServicePriceCreate):
     return service
 
 # View Hospital Service Prices
-@reports_router.get("/services", response={200: list[ServicePriceOut]})
+@managment_router.get("/services", response={200: list[ServicePriceOut]})
 def view_service_prices(request):
     """
     View all hospital service prices.
     """
     return ServicePrice.objects.all()
+
+@managment_router.get("/employees/{role}", response={200: list[UserOut], 400: dict}, auth=AuthBearer())
+def list_employees(request, role: str):
+    """
+    Retrieve employees by role (e.g., doctors, pharmacists).
+    """
+    if request.auth.role != "manager":
+        return 400, {"error": "Only managers can view employees"}
+
+    valid_roles = {"doctor", "pharmacist", "lab_technician", "cashier", "record_officer"}
+    
+    if role not in valid_roles:
+        return 400, {"error": "Invalid role"}
+
+    employees = User.objects.filter(role=role)
+    return employees
+
+# Send Message from Manager to Employee
+@managment_router.post("/send", response={200: MessageOut, 400: dict}, auth=AuthBearer())
+def send_message(request, payload: MessageCreate):
+    """
+    Manager sends a message to an employee.
+    """
+    sender = request.auth
+    if sender.role != "manager":
+        return 400, {"error": "Only managers can send messages"}
+
+    receiver = get_object_or_404(User, id=payload.receiver_id)
+
+    message = ManagerMessage.objects.create(
+        sender=sender,
+        receiver=receiver,
+        subject=payload.subject,
+        message=payload.message,
+    )
+    return message
+
+
+# List Messages for Employee
+@managment_router.get("/inbox", response={200: list[MessageOut]}, auth=AuthBearer())
+def list_received_messages(request):
+    """
+    Retrieve all messages received by the logged-in user.
+    """
+    return ManagerMessage.objects.filter(receiver=request.auth).order_by("-timestamp")
+
+
+# Mark Message as Read
+@managment_router.put("/mark-read/{message_id}", response={200: dict, 400: dict}, auth=AuthBearer())
+def mark_message_as_read(request, message_id: int):
+    """
+    Mark a specific message as read.
+    """
+    message = get_object_or_404(ManagerMessage, id=message_id, receiver=request.auth)
+
+    if message.is_read:
+        return {"message": "Message already read"}
+
+    message.is_read = True
+    message.save()
+    return {"message": "Message marked as read"}

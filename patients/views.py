@@ -120,22 +120,23 @@ async def download_medical_history(request):
 async def submit_comment(request, payload: PatientCommentCreate):
     """
     Patients can submit feedback about the hospital.
-    The comment is sent to the manager for review.
+    The comment is sent to managers for review.
     """
     patient = request.auth
     if patient.role != "patient":
         return 400, {"error": "Only patients can submit comments"}
 
-    # Save the comment in the reports app
+    # Save the comment
     comment = await PatientComment.objects.acreate(
         patient=patient,
         message=payload.message
     )
 
-    # Notify all managers
-    managers = await User.objects.filter(role="manager").all()
-    for manager in managers:
-        await send_notification(manager, "New patient comment received.")
+    # Notify all managers (only if managers exist)
+    if await User.objects.filter(role="manager").aexists():
+        managers = await User.objects.filter(role="manager").all()
+        for manager in managers:
+            await send_notification(manager, f"New patient comment: {payload.message[:50]}...")  # Limit preview
 
     return {"message": "Comment submitted successfully"}
 

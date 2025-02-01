@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'pharmacy',
     'billings',
     'notifications',
-    'reports',
+    'managment',
     'channels', 
 ]
 
