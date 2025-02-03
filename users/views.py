@@ -13,7 +13,7 @@ from .schemas import (
     LoginSchema, SignupSchema, UserOut, ManagerProfileOut, ManagerProfileUpdate,
     DoctorProfileOut, DoctorProfileUpdate, PatientProfileOut, PatientProfileUpdate,
     PharmacistProfileOut, PharmacistProfileUpdate, LabTechnicianProfileOut, LabTechnicianProfileUpdate,
-    CashierProfileOut, CashierProfileUpdate
+    CashierProfileOut, CashierProfileUpdate, CreateemployeeSchema
 )
 
 router = Router(tags=["Authentication & Profiles"])
@@ -25,10 +25,11 @@ def signup(request, payload: SignupSchema):
     Patients can sign up but require approval.
     Employees must be created by a manager.
     """
-    if User.objects.filter(username=payload.username).aexists():
-        return 400, {"error": "username already exists"}
 
-    user = User.objects.acreate(
+    if User.objects.filter(username=payload.username).exists():
+        return 400, {"error": "Username already exists"}
+
+    user = User.objects.create(
         username=payload.username,
         password=make_password(payload.password),
         role="patient",
@@ -41,8 +42,6 @@ def signup(request, payload: SignupSchema):
         send_notification(officer, f"New patient registration pending approval: {user.username}")
 
     return {"message": "Registration successful. Awaiting approval by a record officer."}
-
-
 
 # Login
 @router.post("/login/", response={200: dict, 401: dict})
@@ -100,7 +99,7 @@ async def refresh_token(request):
 
 # Manager Creates Employee Accounts 
 @router.post("/create-employee/", response={200: UserOut, 400: dict}, auth=AuthBearer())
-async def create_employee(request, payload: SignupSchema):
+async def create_employee(request, payload: CreateemployeeSchema):
     if request.auth.role != "manager":
         return 400, {"error": "Only managers can create employee accounts."}
 
