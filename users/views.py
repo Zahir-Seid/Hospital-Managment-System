@@ -49,7 +49,8 @@ def user_login(request, payload: LoginSchema):
     """
     Login using JWT authentication. Returns access and refresh tokens.
     """
-    user = User.objects.filter(username=payload.username).afirst()
+    user = User.objects.filter(username=payload.username).first()  # ✅ Use first() instead of afirst()
+
     if not user or not user.check_password(payload.password):
         return 401, {"error": "Invalid credentials"}
 
@@ -62,9 +63,10 @@ def user_login(request, payload: LoginSchema):
 
     return {
         "message": "Login successful",
-        "access": str(access),  # Short-lived access token
-        "refresh": str(refresh),  # Long-lived refresh token
+        "access": str(access),
+        "refresh": str(refresh),
     }
+
 
 
 # Logout 
