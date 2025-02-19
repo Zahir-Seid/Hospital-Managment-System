@@ -1,0 +1,6 @@
+django
+django-ninja
+django-ninja-jwt
+channels
+pdfkit
+matplotlib
