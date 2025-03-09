@@ -19,6 +19,12 @@ class User(AbstractUser):
     date_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
+    profile_picture = models.ImageField(
+        upload_to='profile_pictures/', 
+        blank=True, 
+        null=True, 
+        default='profile_pictures/default_profile.png'
+    )
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
