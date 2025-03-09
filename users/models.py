@@ -54,6 +54,8 @@ class LabTechnicianProfile(BaseProfile):
 class CashierProfile(BaseProfile):
     pass
 
+class RecordOfficerProfile(BaseProfile):
+    pass
 
 # Patient Profile (Separate as it doesn’t need SSN)
 class PatientProfile(models.Model):

@@ -112,3 +112,12 @@ class CashierProfileOut(BaseModel):
 
 class CashierProfileUpdate(BaseModel):
     ssn: str
+
+class RecordOfficerProfileOut(BaseModel):
+    ssn: str
+
+    class Config:
+        from_attributes = True
+
+class RecordOfficerProfileUpdate(BaseModel):
+    ssn : str

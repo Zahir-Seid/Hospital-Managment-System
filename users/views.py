@@ -7,13 +7,13 @@ from .auth import AsyncAuthBearer, AuthBearer
 from notifications.views import send_notification
 from .models import (
     User, ManagerProfile, DoctorProfile, PatientProfile,
-    PharmacistProfile, LabTechnicianProfile, CashierProfile
+    PharmacistProfile, LabTechnicianProfile, CashierProfile, RecordOfficerProfile
 )
 from .schemas import (
     LoginSchema, SignupSchema, UserOut, ManagerProfileOut, ManagerProfileUpdate,
     DoctorProfileOut, DoctorProfileUpdate, PatientProfileOut, PatientProfileUpdate,
     PharmacistProfileOut, PharmacistProfileUpdate, LabTechnicianProfileOut, LabTechnicianProfileUpdate,
-    CashierProfileOut, CashierProfileUpdate, CreateemployeeSchema
+    CashierProfileOut, CashierProfileUpdate, RecordOfficerProfileOut, RecordOfficerProfileUpdate, CreateemployeeSchema
 )
 
 router = Router(tags=["Authentication & Profiles"])
@@ -49,7 +49,7 @@ def user_login(request, payload: LoginSchema):
     """
     Login using JWT authentication. Returns access and refresh tokens.
     """
-    user = User.objects.filter(username=payload.username).first()  # ✅ Use first() instead of afirst()
+    user = User.objects.filter(username=payload.username).first()  # Use first() instead of afirst()
 
     if not user or not user.check_password(payload.password):
         return 401, {"error": "Invalid credentials"}
@@ -142,6 +142,7 @@ ROLE_TO_PROFILE_MAP = {
     'pharmacist': (PharmacistProfile, PharmacistProfileOut, PharmacistProfileUpdate),
     'lab_technician': (LabTechnicianProfile, LabTechnicianProfileOut, LabTechnicianProfileUpdate),
     'cashier': (CashierProfile, CashierProfileOut, CashierProfileUpdate),
+    'record_Officer': (RecordOfficerProfile, RecordOfficerProfileOut, RecordOfficerProfileUpdate)
 }
 
 # Get Profile 
