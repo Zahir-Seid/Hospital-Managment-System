@@ -21,17 +21,6 @@ from django.db import models
 
 patients_router = Router(tags=["Patients"])
 
-# Get Patient Profile
-@patients_router.get("/profile", response={200: PatientProfileOut}, auth=AuthBearer())
-def get_patient_profile(request):
-    patient = request.auth
-    if patient.role != "patient":
-        return 400, {"error": "Unauthorized"}
-
-    profile = get_object_or_404(PatientProfile, user=patient)
-    return PatientProfileOut.model_validate(profile).model_dump()  # Updated for Pydantic v2
-
-
 # Get Medical History
 @patients_router.get("/history/medical", response={200: MedicalHistoryOut}, auth=AsyncAuthBearer())
 async def get_medical_history(request):
@@ -59,29 +48,6 @@ async def get_billing_history(request):
 
     invoices = await Invoice.objects.filter(patient=patient).all()
     return {"invoices": [InvoiceOut.model_validate(i).model_dump() for i in invoices]}
-
-
-# Get Unread Notifications
-@patients_router.get("/notifications", response={200: list[NotificationOut]}, auth=AsyncAuthBearer())
-async def get_notifications(request):
-    patient = request.auth
-    if patient.role != "patient":
-        return 400, {"error": "Unauthorized"}
-
-    unread_notifications = await Notification.objects.filter(recipient=patient, status="unread").all()
-    return [NotificationOut.model_validate(n).model_dump() for n in unread_notifications]
-
-
-# Mark Notifications as Read
-@patients_router.put("/notifications/mark-read", response={200: dict}, auth=AsyncAuthBearer())
-async def mark_notifications_read(request):
-    patient = request.auth
-    if patient.role != "patient":
-        return 400, {"error": "Unauthorized"}
-
-    await Notification.objects.filter(recipient=patient, status="unread").update(status="read")
-    return {"message": "All notifications marked as read"}
-
 
 # Download Medical History as PDF
 @patients_router.get("/history/download", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
@@ -201,28 +167,6 @@ def assign_room(request, payload: RoomAssignmentSchema):
     patient_profile.save()
 
     return {"message": f"Room {payload.room_number} assigned to patient {patient_profile.user.username}"}
-
-'''
-@patients_router.post("/send-message", response={200: ChatMessageOut, 400: dict}, auth=AsyncAuthBearer)
-async def send_message(request, payload: ChatMessageCreate):
-    """
-    Send a chat message via HTTP instead of WebSockets.
-    """
-    sender = request.auth
-    receiver = await User.objects.filter(id=payload.receiver_id).afirst()
-
-    if not receiver:
-        return 400, {"error": "Receiver not found"}
-
-    # Save message
-    chat_message = await ChatMessage.objects.acreate(
-        sender=sender,
-        receiver=receiver,
-        message=payload.message
-    )
-
-    return chat_message
-'''
 
 # Get Chat History
 @patients_router.get("/chat/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
