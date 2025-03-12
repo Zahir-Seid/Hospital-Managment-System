@@ -225,7 +225,7 @@ async def send_message(request, payload: ChatMessageCreate):
 '''
 
 # Get Chat History
-@patients_router.get("/chat/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
+@patients_router.get("/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
 def get_chat_history(request, receiver_id: int):
     """
     Fetch chat history between the logged-in user and another user (doctor or patient).
@@ -239,3 +239,35 @@ def get_chat_history(request, receiver_id: int):
     ).order_by("timestamp")
 
     return messages
+
+@patients_router.get("/user/patient-records/", response={200: list[PatientProfileOut], 400: dict}, auth=AsyncAuthBearer())
+async def get_patient_records(request):
+    # Fetch the authenticated user (sender)
+    sender = request.auth
+    
+    # Only allow managers or record officers to fetch patient records
+    if sender.role not in ["manager", "record_officer"]:
+        return 400, {"error": "Only managers/record_officers can access patient records"}
+    
+    # Fetch all patients with the role "patient"
+    patients = await User.objects.filter(role="patient").all()
+    
+    # Transform the results into a suitable response format
+    patient_list = [
+        PatientProfileOut(
+            id=patient.id,
+            phone_number=patient.phone_number,
+            email=patient.email,
+            username=patient.username,
+            role=patient.role,
+            address=patient.address,
+            region=patient.region,
+            town=patient.town,
+            kebele=patient.kebele,
+            house_number=patient.house_number,
+            room_number=patient.room_number
+        )
+        for patient in patients
+    ]
+    
+    return patient_list

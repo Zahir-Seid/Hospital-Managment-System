@@ -1,7 +1,6 @@
-# update ssn is experimental should be removed in the end
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
-from datetime import date
+
 # Shared User Schema
 class UserOut(BaseModel):
     id: int
@@ -37,7 +36,6 @@ class CreateemployeeSchema(BaseModel):
     username: str
     password: str = Field(..., min_length=8, max_length=128)
     role: str = Field(..., pattern="^(doctor|pharmacist|lab_technician|cashier|record_officer)$")
-    
 
 # Login schema
 class LoginSchema(BaseModel):
@@ -45,7 +43,7 @@ class LoginSchema(BaseModel):
     password: str
 
 # Manager Profile Schemas
-class ManagerProfileOut(BaseModel):
+class ManagerProfileOut(UserOut):
     ssn: str
 
     class Config:
@@ -55,35 +53,30 @@ class ManagerProfileOut(BaseModel):
 class ManagerProfileUpdate(BaseModel):
     ssn: str
 
-
 # Doctor Profile Schemas
-class DoctorProfileOut(BaseModel):
+class DoctorProfileOut(UserOut):
     ssn: str
     department: str
     level: str
 
     class Config:
         from_attributes = True
-
 
 class DoctorProfileUpdate(BaseModel):
     ssn: str
     department: str
     level: str
 
-
 # Patient Profile Schemas
-class PatientProfileOut(BaseModel):
+class PatientProfileOut(UserOut):
     region: str
     town: str
     kebele: str
     house_number: str
-    room_number: str 
+    room_number: str
 
     class Config:
         from_attributes = True
-
-
 
 class PatientProfileUpdate(BaseModel):
     region: str
@@ -91,47 +84,42 @@ class PatientProfileUpdate(BaseModel):
     kebele: str
     house_number: str
 
-
 # Pharmacist Profile Schemas
-class PharmacistProfileOut(BaseModel):
+class PharmacistProfileOut(UserOut):
     ssn: str
 
     class Config:
         from_attributes = True
-
 
 class PharmacistProfileUpdate(BaseModel):
     ssn: str
 
-
 # Lab Technician Profile Schemas
-class LabTechnicianProfileOut(BaseModel):
+class LabTechnicianProfileOut(UserOut):
     ssn: str
 
     class Config:
         from_attributes = True
-
 
 class LabTechnicianProfileUpdate(BaseModel):
     ssn: str
 
-
 # Cashier Profile Schemas
-class CashierProfileOut(BaseModel):
+class CashierProfileOut(UserOut):
     ssn: str
 
     class Config:
         from_attributes = True
 
-
 class CashierProfileUpdate(BaseModel):
     ssn: str
 
-class RecordOfficerProfileOut(BaseModel):
+# Record Officer Profile Schemas
+class RecordOfficerProfileOut(UserOut):
     ssn: str
 
     class Config:
         from_attributes = True
 
 class RecordOfficerProfileUpdate(BaseModel):
-    ssn : str
+    ssn: str

@@ -19,6 +19,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.utils.dateparse import parse_date
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 router = Router(tags=["Authentication & Profiles"])
 
@@ -152,14 +153,57 @@ async def create_employee(request, payload: CreateemployeeSchema):
 
     return user
 
+# endpoint to list the patients that are about to be reviewwd for approval
+@router.get("/approve-patient",  response={200: dict, 404: dict}, auth=AsyncAuthBearer())
+async def get_inactive_patients(request):
+    try:
+        # Query the patients with is_active=False
+        patients = await PatientProfile.objects.filter(user__is_active=False)
 
+        # Prepare the data to return
+        patient_data = []
+        for patient in patients:
+            profile_picture_url = None
+            if patient.user.profile_picture:
+                profile_picture_url = patient.user.profile_picture.url  # Get the profile picture URL
+
+            patient_data.append({
+                "user_id" : patient.user.id,
+                "username": patient.user.username,
+                "first_name": patient.user.first_name,
+                "last_name": patient.user.last_name,
+                "email": patient.user.email,
+                "phone_number": patient.user.phone_number,
+                "address": patient.user.address,
+                "gender": patient.user.gender,
+                "date_of_birth": patient.user.date_of_birth,
+                "region": patient.region,
+                "town": patient.town,
+                "kebele": patient.kebele,
+                "house_number": patient.house_number,
+                "profile_picture_url": profile_picture_url,  # Add the profile picture URL
+            })
+        
+        # Return the response as JSON
+        return 200, {"patients": patient_data}
+
+    except Exception as e:
+        return 500, {"error": str(e)}
+    
 # Record Officer Approves Patient Signup 
-@router.put("/approve-patient/{user_id}/", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
-async def approve_patient(request, user_id: int):
+@router.put("/approve-patient/", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
+async def approve_patient(request, payload: dict):
+    """
+    Approve a patient registration. Only accessible by record officers.
+    """
+    user_id = payload.get("user_id") 
+
+    # Check if the requestor is a record officer
     if request.auth.role != "record_officer":
         return 400, {"error": "Only record officers can approve patients."}
-
-    patient = await get_object_or_404(User.objects.filter(id=user_id, role="patient", is_active=False))
+    patient = await User.objects.filter(id=user_id, role="patient", is_active=False).afirst()
+    if not patient:
+        return 400, {"error": "Patient not found or already approved."}
     patient.is_active = True
     await patient.asave()
 
