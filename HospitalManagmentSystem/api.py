@@ -14,7 +14,7 @@ from managment.views import managment_router
 api = NinjaAPI(title="Hospital Management API")
 
 # Register the routers correctly
-api.add_router("/", user_router)
+api.add_router("/user", user_router)
 api.add_router("/appointments", appointment_router)
 api.add_router("/lab", lab_router)
 api.add_router("/pharmacy", pharmacy_router)

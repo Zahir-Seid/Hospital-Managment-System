@@ -1,6 +1,7 @@
 # update ssn is experimental should be removed in the end
-
+from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
+from datetime import date
 # Shared User Schema
 class UserOut(BaseModel):
     id: int
@@ -18,12 +19,25 @@ class SignupSchema(BaseModel):
     email: EmailStr
     username: str
     password: str = Field(..., min_length=8, max_length=128)
+    first_name: str
+    middle_name: Optional[str] = None
+    last_name: str
+    phone_number: str
+    gender: str
+    date_of_birth: str
+    address: str
+    region: str
+    town: str
+    kebele: str
+    house_number: str
+    profile_picture: Optional[str] = None
 
 class CreateemployeeSchema(BaseModel):
     email: EmailStr
     username: str
     password: str = Field(..., min_length=8, max_length=128)
     role: str = Field(..., pattern="^(doctor|pharmacist|lab_technician|cashier|record_officer)$")
+    
 
 # Login schema
 class LoginSchema(BaseModel):

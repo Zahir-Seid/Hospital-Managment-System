@@ -15,29 +15,61 @@ from .schemas import (
     PharmacistProfileOut, PharmacistProfileUpdate, LabTechnicianProfileOut, LabTechnicianProfileUpdate,
     CashierProfileOut, CashierProfileUpdate, RecordOfficerProfileOut, RecordOfficerProfileUpdate, CreateemployeeSchema
 )
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.utils.dateparse import parse_date
+from django.contrib.auth import get_user_model
 
 router = Router(tags=["Authentication & Profiles"])
 
-# Signup
 @router.post("/signup/", response={200: dict, 400: dict})
 def signup(request, payload: SignupSchema):
     """
     Patients can sign up but require approval.
     Employees must be created by a manager.
     """
-
-    if User.objects.filter(username=payload.username).exists():
+    # Check if the username already exists in User model
+    if get_user_model().objects.filter(username=payload.username).exists():
         return 400, {"error": "Username already exists"}
 
-    user = User.objects.create(
+    # Create the User object (set as inactive for patient approval)
+    user = get_user_model().objects.create(
         username=payload.username,
         password=make_password(payload.password),
-        role="patient",
-        is_active=False  # Patients require approval
+        email=payload.email,
+        first_name=payload.first_name,
+        middle_name=payload.middle_name,
+        last_name=payload.last_name,
+        phone_number=payload.phone_number,
+        gender=payload.gender,
+        date_of_birth=parse_date(payload.date_of_birth),
+        address=payload.address,
+        role="patient",  # Default to patient role
+        is_active=False  # Set patient as inactive until approved by a record officer
     )
 
-    # Notify Record Officers
-    record_officers = User.objects.filter(role="record_officer").all()
+    # Create the PatientProfile and associate with the created user
+    patient_profile = PatientProfile.objects.create(
+        user=user,  # Link to the User model via OneToOneField
+        region=payload.region,
+        town=payload.town,
+        kebele=payload.kebele,
+        house_number=payload.house_number,
+    )
+
+    # Handle profile picture if provided
+    if payload.profile_picture:
+        try:
+            profile_picture_data = payload.profile_picture
+            profile_picture_name = f"profile_pictures/{user.username}_profile_picture.jpg"  
+            default_storage.save(profile_picture_name, ContentFile(profile_picture_data))
+            user.profile_picture = profile_picture_name
+            user.save()
+        except Exception as e:
+            return 400, {"Error saving profile picture: " + str(e)}
+
+    # Notify Record Officers for approval
+    record_officers = get_user_model().objects.filter(role="record_officer").all()
     for officer in record_officers:
         send_notification(officer, f"New patient registration pending approval: {user.username}")
 
