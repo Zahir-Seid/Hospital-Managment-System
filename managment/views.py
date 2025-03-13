@@ -186,31 +186,52 @@ async def get_patient_comments(request):
 # Employees Mark Their Own Attendance
 @managment_router.post("/attendance", response={200: EmployeeAttendanceOut, 400: dict}, auth=AuthBearer())
 def mark_own_attendance(request, payload: EmployeeAttendanceCreate):
-    """
-    Employees mark their own attendance. Each employee can only mark once per day.
-    """
-    employee = request.auth  # Get authenticated user
+    employee = request.auth
 
-    # Prevent duplicate attendance entry for the same day
-    if EmployeeAttendance.objects.filter(employee=employee, date=now().date()).exists():
-        return 400, {"error": "Attendance already marked for today"}
+    # Get today's attendance record or create it
+    attendance, created = EmployeeAttendance.objects.get_or_create(employee=employee, date=now().date())
 
-    attendance = EmployeeAttendance.objects.create(employee=employee, status=payload.status)
-    return attendance
+    if payload.action == "check_in":
+        if attendance.check_in:
+            return 400, {"error": "Check-in already recorded for today"}
+        attendance.check_in = payload.time
+
+    elif payload.action == "check_out":
+        if not attendance.check_in:
+            return 400, {"error": "You must check in before checking out"}
+        if attendance.check_out:
+            return 400, {"error": "Check-out already recorded for today"}
+        attendance.check_out = payload.time
+
+    attendance.save()
+    return EmployeeAttendanceOut(
+        id=attendance.id,
+        employee_id=attendance.employee.id,
+        employee_name=attendance.employee.username,
+        date=attendance.date,
+        check_in=attendance.check_in,
+        check_out=attendance.check_out,
+        total_hours=attendance.total_hours()
+    )
+
 
 # Managers View All Employee Attendance Records
 @managment_router.get("/attendance", response={200: list[EmployeeAttendanceOut]}, auth=AuthBearer())
 def view_attendance(request):
-    """
-    Managers view all employee attendance records.
-    """
     if request.auth.role != "manager":
         return 400, {"error": "Only managers can view attendance records"}
 
     return [
         EmployeeAttendanceOut(
-            id=a.id, employee_id=a.employee.id, employee_name=a.employee.username, date=a.date, status=a.status
-        ) for a in EmployeeAttendance.objects.all()
+            id=a.id,
+            employee_id=a.employee.id,
+            employee_name=a.employee.username,
+            date=a.date,
+            check_in=a.check_in,
+            check_out=a.check_out,
+            total_hours=a.total_hours()
+        )
+        for a in EmployeeAttendance.objects.select_related("employee").all()
     ]
 
 # Add/Update Hospital Service Prices
@@ -280,19 +301,3 @@ def list_received_messages(request):
     Retrieve all messages received by the logged-in user.
     """
     return ManagerMessage.objects.filter(receiver=request.auth).order_by("-timestamp")
-
-
-# Mark Message as Read
-@managment_router.put("/mark-read/{message_id}", response={200: dict, 400: dict}, auth=AuthBearer())
-def mark_message_as_read(request, message_id: int):
-    """
-    Mark a specific message as read.
-    """
-    message = get_object_or_404(ManagerMessage, id=message_id, receiver=request.auth)
-
-    if message.is_read:
-        return {"message": "Message already read"}
-
-    message.is_read = True
-    message.save()
-    return {"message": "Message marked as read"}

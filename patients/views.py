@@ -225,7 +225,7 @@ async def send_message(request, payload: ChatMessageCreate):
 '''
 
 # Get Chat History
-@patients_router.get("/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
+@patients_router.get("/chat/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
 def get_chat_history(request, receiver_id: int):
     """
     Fetch chat history between the logged-in user and another user (doctor or patient).
@@ -265,7 +265,8 @@ async def get_patient_records(request):
             town=patient.town,
             kebele=patient.kebele,
             house_number=patient.house_number,
-            room_number=patient.room_number
+            room_number=patient.room_number,
+            is_active=patient.is_active
         )
         for patient in patients
     ]
