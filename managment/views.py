@@ -257,21 +257,16 @@ def view_service_prices(request):
     """
     return ServicePrice.objects.all()
 
-@managment_router.get("/employees/{role}", response={200: list[UserOut], 400: dict}, auth=AuthBearer())
-def list_employees(request, role: str):
+@managment_router.get("/employees/", response={200: list[UserOut], 400: dict}, auth=AuthBearer())
+def list_employees(request):
     """
     Retrieve employees by role (e.g., doctors, pharmacists).
     """
     if request.auth.role != "manager":
-        return 400, {"error": "Only managers can view employees"}
+        return 400, {"error": "Only managers can view employees"}    
 
-    valid_roles = {"doctor", "pharmacist", "lab_technician", "cashier", "record_officer"}
-    
-    if role not in valid_roles:
-        return 400, {"error": "Invalid role"}
-
-    employees = User.objects.filter(role=role)
-    return employees
+    employees = User.objects.all()
+    return 200, employees
 
 # Send Message from Manager to Employee
 @managment_router.post("/send", response={200: MessageOut, 400: dict}, auth=AuthBearer())

@@ -31,7 +31,7 @@ class SignupSchema(BaseModel):
     house_number: str
     profile_picture: Optional[str] = None
 
-class CreateemployeeSchema(BaseModel):
+class CreateemployeeSchema(UserOut):
     email: EmailStr
     username: str
     password: str = Field(..., min_length=8, max_length=128)
