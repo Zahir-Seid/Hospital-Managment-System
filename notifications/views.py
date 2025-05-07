@@ -15,7 +15,6 @@ def send_notification(request, payload: NotificationCreate):
     """
     Create a notification for a user and send it in real-time via WebSockets.
     """
-    sender = request.auth  # Authenticated user
     recipient = get_object_or_404(User, id=payload.recipient_id)
 
     # Store notification in the database
@@ -38,14 +37,26 @@ def send_notification(request, payload: NotificationCreate):
 
     return notification
 
-# List notifications for the logged-in user
 @notifications_router.get("/list", response={200: list[NotificationOut]})
 def list_notifications(request):
     """
     Retrieve notifications for the logged-in user.
     """
     user = request.auth
-    return Notification.objects.filter(recipient=user)
+
+    notifications = Notification.objects.filter(recipient=user)
+
+    return [
+        NotificationOut(
+            id=n.id,
+            recipient=n.recipient.username,
+            message=n.message,
+            status=n.status,
+            created_at=n.created_at,
+        )
+        for n in notifications
+    ]
+
 
 
 # Mark a notification as read
@@ -59,7 +70,16 @@ def mark_notification_read(request, notification_id: int):
 
     notification.status = "read"
     notification.save()
-    return notification
+
+    # Manually convert to dict with string fields
+    return {
+        "id": notification.id,
+        "recipient": str(notification.recipient),  # convert User to string
+        "message": notification.message,
+        "status": notification.status,
+        "created_at": notification.created_at,
+    }
+
 
 
 # Delete a notification

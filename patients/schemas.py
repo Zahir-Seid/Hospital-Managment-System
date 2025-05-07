@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from users.schemas import PatientProfileOut  
+from users.schemas import PatientProfileOut, UserOut
 
 # Appointment Schema
 class AppointmentOut(BaseModel):

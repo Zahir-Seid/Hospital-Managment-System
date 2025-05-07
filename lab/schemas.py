@@ -22,3 +22,15 @@ class LabTestOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class MessageOut(BaseModel):
+    id: int
+    sender: str
+    receiver: str
+    subject: str
+    message: str
+    timestamp: datetime
+    is_read: bool
+
+    class Config:
+        from_attributes = True

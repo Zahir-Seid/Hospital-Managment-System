@@ -5,7 +5,6 @@ class Invoice(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('paid', 'Paid'),
-        ('approved', 'Approved'),
     ]
 
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="invoices", limit_choices_to={'role': 'patient'})

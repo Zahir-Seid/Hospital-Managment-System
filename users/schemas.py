@@ -1,19 +1,37 @@
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from datetime import date
+from ninja import Router, File, Form
+from ninja.files import UploadedFile
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
-# Shared User Schema
 class UserOut(BaseModel):
     id: int
-    phone_number: str
-    email: EmailStr
     username: str
+    email: EmailStr
+    first_name: str
+    last_name: str
+    phone_number: Optional[str] = None
+    middle_name: Optional[str] = None
     role: str
-    address: str
+    address: Optional[str] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    profile_picture: Optional[str] = None
 
-    class Config:
+    @field_validator('profile_picture', mode='before')
+    @classmethod
+    def handle_image_field(cls, value):
+        print(value)
+        if value and hasattr(value, 'url'):
+            return value.url
+        return None
+    
+    class Config: 
         from_attributes = True
 
-# Signup Schema
+
 class SignupSchema(BaseModel):
     email: EmailStr
     username: str
@@ -29,33 +47,32 @@ class SignupSchema(BaseModel):
     town: str
     kebele: str
     house_number: str
-    profile_picture: Optional[str] = None
+    ssn: str
 
-class CreateemployeeSchema(UserOut):
-    email: EmailStr
-    username: str
-    password: str = Field(..., min_length=8, max_length=128)
-    role: str = Field(..., pattern="^(doctor|pharmacist|lab_technician|cashier|record_officer)$")
+class CreateemployeeSchema(BaseModel):
+    first_name: str 
+    middle_name: str 
+    last_name: str 
+    phone_number: str 
+    gender: str 
+    date_of_birth: str 
+    address: str 
+    ssn: str 
+    email: str 
+    username: str 
+    password: str 
+    role: str 
+    department: str 
+    level: str 
 
 # Login schema
 class LoginSchema(BaseModel):
     username: str
     password: str
 
-# Manager Profile Schemas
-class ManagerProfileOut(UserOut):
-    ssn: str
-
-    class Config:
-        from_attributes = True
-
-
-class ManagerProfileUpdate(BaseModel):
-    ssn: str
-
 # Doctor Profile Schemas
-class DoctorProfileOut(UserOut):
-    ssn: str
+class DoctorProfileOut(BaseModel):
+    user: UserOut
     department: str
     level: str
 
@@ -63,20 +80,21 @@ class DoctorProfileOut(UserOut):
         from_attributes = True
 
 class DoctorProfileUpdate(BaseModel):
-    ssn: str
     department: str
     level: str
 
 # Patient Profile Schemas
-class PatientProfileOut(UserOut):
+class PatientProfileOut(BaseModel):
+    user: UserOut
     region: str
     town: str
     kebele: str
     house_number: str
-    room_number: str
+    room_number: Optional[str] = None
 
     class Config:
         from_attributes = True
+
 
 class PatientProfileUpdate(BaseModel):
     region: str
@@ -84,42 +102,8 @@ class PatientProfileUpdate(BaseModel):
     kebele: str
     house_number: str
 
-# Pharmacist Profile Schemas
-class PharmacistProfileOut(UserOut):
-    ssn: str
+class TokenSchema(BaseModel):
+    refresh_token: str
 
-    class Config:
-        from_attributes = True
-
-class PharmacistProfileUpdate(BaseModel):
-    ssn: str
-
-# Lab Technician Profile Schemas
-class LabTechnicianProfileOut(UserOut):
-    ssn: str
-
-    class Config:
-        from_attributes = True
-
-class LabTechnicianProfileUpdate(BaseModel):
-    ssn: str
-
-# Cashier Profile Schemas
-class CashierProfileOut(UserOut):
-    ssn: str
-
-    class Config:
-        from_attributes = True
-
-class CashierProfileUpdate(BaseModel):
-    ssn: str
-
-# Record Officer Profile Schemas
-class RecordOfficerProfileOut(UserOut):
-    ssn: str
-
-    class Config:
-        from_attributes = True
-
-class RecordOfficerProfileUpdate(BaseModel):
-    ssn: str
+class ApprovePayload(BaseModel):
+    user_id: int

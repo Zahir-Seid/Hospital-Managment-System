@@ -9,6 +9,8 @@ class AppointmentCreate(BaseModel):
     reason: Optional[str]
 
 class AppointmentUpdate(BaseModel):
+    date: date 
+    time: time
     status: Optional[str] = None
     reason: Optional[str] = None
 
@@ -20,6 +22,12 @@ class AppointmentOut(BaseModel):
     time: time
     status: str
     reason: Optional[str]
+    patient_profile_picture: Optional[str] = None 
 
     class Config:
         from_attributes = True
+
+class SimplePatientResponse(BaseModel):
+    id: int
+    patient: str
+    doctor: Optional[str] = None

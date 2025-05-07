@@ -1,10 +1,8 @@
 import json
 from urllib.parse import parse_qs
 from channels.generic.websocket import AsyncWebsocketConsumer
-from users.models import User
-from .models import ChatMessage
-from django.utils.timezone import now
 from users.auth import AsyncAuthBearer
+from notifications.utils import send_real_time_notification_to_user
 
 auth = AsyncAuthBearer()
 
@@ -13,6 +11,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         Authenticate user using AsyncAuthBearer when WebSocket connects.
         """
+        from users.models import User 
+        from django.utils.timezone import now 
+
         try:
             query_string = self.scope["query_string"].decode()
             query_params = parse_qs(query_string)
@@ -22,7 +23,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.close(code=4000)  # Missing token
                 return
 
-            self.user = await auth.authenticate(self.scope, token)
+            from users.models import User
+            from ninja_jwt.tokens import AccessToken  # This works with django-ninja-jwt
+
+            try:
+                validated_token = AccessToken(token)
+                user_id = validated_token["user_id"]
+                self.user = await User.objects.filter(id=user_id).afirst()
+            except Exception as e:
+                print(f"Token error: {e}")
+                await self.close(code=4001)  # Invalid token
+                return
 
             if not self.user:
                 await self.close(code=4001)  # Invalid token
@@ -60,58 +71,50 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         Remove user from WebSocket channel on disconnect.
         """
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        if hasattr(self, "room_group_name"):
+            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
-        """
-        Handle incoming WebSocket messages.
-        """
+        from .models import ChatMessage  
+        from django.utils.timezone import now
+
         try:
             data = json.loads(text_data)
-            receiver_id = data.get("receiver_id")
             message_text = data.get("message")
 
-            if not receiver_id or not message_text:
-                await self.send(text_data=json.dumps({"error": "Invalid message format"}))
+            if not message_text:
+                await self.send(text_data=json.dumps({"error": "Message is required"}))
                 return
 
-            receiver = await User.objects.filter(id=receiver_id).afirst()
+            receiver = self.receiver  # Use stored receiver from `connect()`
 
-            if not receiver:
-                await self.send(text_data=json.dumps({"error": "Receiver not found"}))
-                return
-
-            # Ensure that the sender is either the patient or doctor in the chat
-            if self.user not in [self.receiver, receiver]:
-                await self.send(text_data=json.dumps({"error": "Unauthorized access"}))
-                return
-
-            # Use a unique room name for doctor-patient chat
-            self.room_group_name = f"chat_{min(self.user.id, receiver.id)}_{max(self.user.id, receiver.id)}"
-
-            # Save message in the database
+            # Save message
             chat_message = await ChatMessage.objects.acreate(
                 sender=self.user,
                 receiver=receiver,
                 message=message_text,
                 timestamp=now(),
             )
+            
+            await send_real_time_notification_to_user(receiver, f"Chat from {self.user.username} ")
 
-            # Send message only to the recipient in the same room
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     "type": "chat.message",
                     "sender": self.user.username,
+                    "sender_id": self.user.id,  
                     "receiver": receiver.username,
+                    "receiver_id": receiver.id,
                     "message": message_text,
                     "timestamp": str(chat_message.timestamp),
                 },
             )
 
         except Exception as e:
-            print(f"Error processing WebSocket message: {e}")
+            print(f"Error processing message: {e}")
             await self.send(text_data=json.dumps({"error": "Internal server error"}))
+
 
     async def chat_message(self, event):
         """

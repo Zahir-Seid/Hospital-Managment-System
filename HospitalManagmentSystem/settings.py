@@ -29,8 +29,6 @@ ALLOWED_HOSTS = []
 
 # Cors Allowed 
 CORS_ALLOWED_ORIGINS = [
-    "https://example.com",
-    "https://sub.example.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -93,6 +91,7 @@ WSGI_APPLICATION = 'HospitalManagmentSystem.wsgi.application'
 
 # WebSockets Configuration
 ASGI_APPLICATION = "HospitalManagmentSystem.asgi.application"
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
@@ -155,7 +154,9 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
-
+import os
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 STATIC_URL = 'static/'
 
 # Default primary key field type

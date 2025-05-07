@@ -7,47 +7,67 @@ from pharmacy.models import Prescription
 from billings.models import Invoice
 from .schemas import (
     PatientProfileOut, MedicalHistoryOut, BillingHistoryOut, RoomAssignmentSchema, AppointmentOut, LabTestOut, PrescriptionOut,
-    InvoiceOut, PatientCommentCreate, PatientReferralCreate, PatientReferralOut, ChatMessageCreate, ChatMessageOut
+    InvoiceOut, PatientCommentCreate, PatientReferralCreate, PatientReferralOut, ChatMessageCreate,  UserOut
 )
 from users.auth import AuthBearer, AsyncAuthBearer  
 from notifications.models import Notification
 from notifications.schemas import NotificationOut
 from notifications.views import send_notification
+from notifications.utils import send_notification_to_user
 from .models import PatientComment, PatientReferral, ChatMessage
 from users.models import User, PatientProfile
 import pdfkit  
 from django.utils.timezone import now
 from django.db import models
+from asgiref.sync import sync_to_async
 
 patients_router = Router(tags=["Patients"])
+async_send_notification = sync_to_async(send_notification)
 
 # Get Patient Profile
-@patients_router.get("/profile", response={200: PatientProfileOut}, auth=AuthBearer())
+@patients_router.get("/profile", response={200: dict}, auth=AuthBearer())
 def get_patient_profile(request):
     patient = request.auth
     if patient.role != "patient":
         return 400, {"error": "Unauthorized"}
 
     profile = get_object_or_404(PatientProfile, user=patient)
-    return PatientProfileOut.model_validate(profile).model_dump()  # Updated for Pydantic v2
+
+    # Manually convert model to dict
+    data = PatientProfileOut.model_validate(profile).model_dump()
+
+    # Build full URL for profile picture
+    if patient.profile_picture:
+        data["user"]["profile_picture"] = request.build_absolute_uri(patient.profile_picture.url)
+    else:
+        data["user"]["profile_picture"] = None
+
+    return 200, data
 
 
 # Get Medical History
-@patients_router.get("/history/medical", response={200: MedicalHistoryOut}, auth=AsyncAuthBearer())
-async def get_medical_history(request):
+@patients_router.get("/history/medical", response={200: MedicalHistoryOut}, auth=AuthBearer())
+def get_medical_history(request):
     patient = request.auth
     if patient.role != "patient":
         return 400, {"error": "Unauthorized"}
 
-    appointments = await Appointment.objects.filter(patient=patient).all()
-    lab_tests = await LabTest.objects.filter(patient=patient).all()
-    prescriptions = await Prescription.objects.filter(patient=patient).all()
+    appointments = Appointment.objects.filter(patient=patient).all()
+    lab_tests = LabTest.objects.filter(patient=patient).all()
+    prescriptions =  Prescription.objects.filter(patient=patient).all()
 
     return {
-        "appointments": [AppointmentOut.model_validate(a).model_dump() for a in appointments],
+        "appointments": [
+            AppointmentOut.model_validate({
+                **a.__dict__,  # Convert the Appointment object to a dict
+                "doctor": a.doctor.username,  # Assuming you want the doctor's username
+                "time": a.time.strftime("%H:%M"),  # Convert time to string in the format HH:MM
+            }).model_dump() for a in appointments
+        ],
         "lab_tests": [LabTestOut.model_validate(l).model_dump() for l in lab_tests],
         "prescriptions": [PrescriptionOut.model_validate(p).model_dump() for p in prescriptions],
     }
+
 
 
 # Get Billing History
@@ -79,73 +99,32 @@ async def mark_notifications_read(request):
     if patient.role != "patient":
         return 400, {"error": "Unauthorized"}
 
-    await Notification.objects.filter(recipient=patient, status="unread").update(status="read")
+    await Notification.objects.filter(recipient=patient, status="unread").aupdate(status="read")
     return {"message": "All notifications marked as read"}
 
-
-# Download Medical History as PDF
-@patients_router.get("/history/download", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
-async def download_medical_history(request):
-    patient = request.auth
-    if patient.role != "patient":
-        return 400, {"error": "Unauthorized"}
-
-    appointments = await Appointment.objects.filter(patient=patient).all()
-    lab_tests = await LabTest.objects.filter(patient=patient).all()
-    prescriptions = await Prescription.objects.filter(patient=patient).all()
-
-    html_content = f"""
-    <h2>Medical History for {patient.username}</h2>
-    <h3>Appointments:</h3>
-    <ul>
-    {''.join([f'<li>{a.date} - {a.reason}</li>' for a in appointments])}
-    </ul>
-    <h3>Lab Tests:</h3>
-    <ul>
-    {''.join([f'<li>{l.test_name} - {l.status}</li>' for l in lab_tests])}
-    </ul>
-    <h3>Prescriptions:</h3>
-    <ul>
-    {''.join([f'<li>{p.medication_name} - {p.status}</li>' for p in prescriptions])}
-    </ul>
-    """
-
-    pdf_file = f"/tmp/medical_history_{patient.id}.pdf"
-    pdfkit.from_string(html_content, pdf_file)
-
-    return {"message": "PDF generated", "file_path": pdf_file}
-
 # Submit a Patient Comment
-@patients_router.post("/comment", response={200: dict, 400: dict}, auth=AsyncAuthBearer())
-async def submit_comment(request, payload: PatientCommentCreate):
-    """
-    Patients can submit feedback about the hospital.
-    The comment is sent to managers for review.
-    """
+@patients_router.post("/comment", response={200: dict, 400: dict}, auth=AuthBearer())
+def submit_comment(request, payload: PatientCommentCreate):
     patient = request.auth
     if patient.role != "patient":
         return 400, {"error": "Only patients can submit comments"}
 
-    # Save the comment
-    comment = await PatientComment.objects.acreate(
+    comment = PatientComment.objects.acreate(
         patient=patient,
         message=payload.message
     )
 
-    # Notify all managers (only if managers exist)
-    if await User.objects.filter(role="manager").aexists():
-        managers = await User.objects.filter(role="manager").all()
+    if User.objects.filter(role="manager").aexists():
+        managers = User.objects.filter(role="manager").all()
         for manager in managers:
-            await send_notification(manager, f"New patient comment: {payload.message[:50]}...")  # Limit preview
+            async_send_notification(manager, f"New patient comment: {payload.message[:50]}...")
 
     return {"message": "Comment submitted successfully"}
 
+
 # Doctor Refers a Patient
-@patients_router.post("/refer", response={200: PatientReferralOut, 400: dict}, auth=AuthBearer())
+@patients_router.post("/refer", response={200: dict, 400: dict}, auth=AuthBearer())
 def refer_patient(request, payload: PatientReferralCreate):
-    """
-    Doctor refers a patient to another doctor.
-    """
     doctor = request.auth
 
     if doctor.role != "doctor":
@@ -162,17 +141,22 @@ def refer_patient(request, payload: PatientReferralCreate):
         created_at=now(),
     )
 
-    # Notify the referred doctor
-    send_notification(referred_doctor, f"You have received a patient referral from Dr. {doctor.username}.")
+    send_notification_to_user(referred_doctor, f"You have received a patient referral from Dr. {doctor.username}.")
 
-    return referral
+    return {
+        "id": referral.id,
+        "doctor": str(referral.doctor),           
+        "patient": str(referral.patient),         
+        "referred_to": str(referral.referred_to), 
+        "reason": referral.reason,
+        "created_at": referral.created_at,
+    }
+
+
 
 # View Referrals for a Doctor
 @patients_router.get("/referrals", response={200: list[PatientReferralOut]}, auth=AuthBearer())
 def view_referrals(request):
-    """
-    Doctors view the referrals they received.
-    """
     doctor = request.auth
 
     if doctor.role != "doctor":
@@ -181,11 +165,9 @@ def view_referrals(request):
     referrals = PatientReferral.objects.filter(referred_to=doctor)
     return referrals
 
+
 @patients_router.put("/assign-room", response={200: dict, 400: dict}, auth=AuthBearer())
 def assign_room(request, payload: RoomAssignmentSchema):
-    """
-    Assign a room to a patient (Only Record Officers can do this).
-    """
     user = request.auth
 
     if user.role != "record_officer":
@@ -193,7 +175,6 @@ def assign_room(request, payload: RoomAssignmentSchema):
 
     patient_profile = get_object_or_404(PatientProfile, user_id=payload.patient_id)
 
-    # Ensure room number is unique
     if PatientProfile.objects.filter(room_number=payload.room_number).exists():
         return 400, {"error": "Room number already assigned"}
 
@@ -201,6 +182,61 @@ def assign_room(request, payload: RoomAssignmentSchema):
     patient_profile.save()
 
     return {"message": f"Room {payload.room_number} assigned to patient {patient_profile.user.username}"}
+
+
+# Get Chat History
+@patients_router.get("/chat/history", response={200: list[dict]}, auth=AuthBearer())
+def get_chat_history(request, receiver_id: int):
+    user = request.auth
+    if user.role not in ['patient', 'doctor']:
+        return 401, {"message": "Unauthorized"}
+
+    receiver = get_object_or_404(User, id=receiver_id)
+
+    messages = ChatMessage.objects.filter(
+        (models.Q(sender=user) & models.Q(receiver=receiver)) |
+        (models.Q(sender=receiver) & models.Q(receiver=user))
+    ).order_by("timestamp")
+
+    serialized_messages = [
+        {
+            "id": msg.id,
+            "sender": msg.sender.username,  
+            "receiver": msg.receiver.username,  
+            "message": msg.message,
+            "timestamp": msg.timestamp,
+        }
+        for msg in messages
+    ]
+
+    return serialized_messages
+
+
+
+@patients_router.get("/user/patient-records/", response={200: list[PatientProfileOut], 400: dict}, auth=AuthBearer())
+def get_patient_records(request):
+    sender = request.auth
+
+    if sender.role not in ["manager", "record_officer"]:
+        return 400, {"error": "Only managers/record_officers can access patient records"}
+
+    # Fetch all patients with their related PatientProfile
+    patients = User.objects.filter(role="patient", patient_profile__isnull=False).select_related("patient_profile")
+
+    patient_list = [
+        PatientProfileOut(
+            user=UserOut.from_orm(patient),
+            region=patient.patient_profile.region or "",
+            town=patient.patient_profile.town or "",
+            kebele=patient.patient_profile.kebele or "",
+            house_number=patient.patient_profile.house_number or "",
+            room_number=patient.patient_profile.room_number
+        )
+        for patient in patients
+    ]
+
+    return patient_list
+
 
 '''
 @patients_router.post("/send-message", response={200: ChatMessageOut, 400: dict}, auth=AsyncAuthBearer)
@@ -223,52 +259,3 @@ async def send_message(request, payload: ChatMessageCreate):
 
     return chat_message
 '''
-
-# Get Chat History
-@patients_router.get("/chat/history", response={200: list[ChatMessageOut]}, auth=AuthBearer())
-def get_chat_history(request, receiver_id: int):
-    """
-    Fetch chat history between the logged-in user and another user (doctor or patient).
-    """
-    user = request.auth
-    receiver = get_object_or_404(User, id=receiver_id)
-
-    messages = ChatMessage.objects.filter(
-        (models.Q(sender=user) & models.Q(receiver=receiver))
-        | (models.Q(sender=receiver) & models.Q(receiver=user))
-    ).order_by("timestamp")
-
-    return messages
-
-@patients_router.get("/user/patient-records/", response={200: list[PatientProfileOut], 400: dict}, auth=AsyncAuthBearer())
-async def get_patient_records(request):
-    # Fetch the authenticated user (sender)
-    sender = request.auth
-    
-    # Only allow managers or record officers to fetch patient records
-    if sender.role not in ["manager", "record_officer"]:
-        return 400, {"error": "Only managers/record_officers can access patient records"}
-    
-    # Fetch all patients with the role "patient"
-    patients = await User.objects.filter(role="patient").all()
-    
-    # Transform the results into a suitable response format
-    patient_list = [
-        PatientProfileOut(
-            id=patient.id,
-            phone_number=patient.phone_number,
-            email=patient.email,
-            username=patient.username,
-            role=patient.role,
-            address=patient.address,
-            region=patient.region,
-            town=patient.town,
-            kebele=patient.kebele,
-            house_number=patient.house_number,
-            room_number=patient.room_number,
-            is_active=patient.is_active
-        )
-        for patient in patients
-    ]
-    
-    return patient_list

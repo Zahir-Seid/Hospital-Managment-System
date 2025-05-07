@@ -3,7 +3,7 @@ from billings.models import Invoice
 from appointments.models import Appointment
 from lab.models import LabTest
 from pharmacy.models import Prescription
-from users.models import User
+from users.models import User, DoctorProfile
 from users.schemas import UserOut
 from notifications.models import Notification
 from notifications.views import send_notification
@@ -12,183 +12,152 @@ import io
 import base64
 import csv
 from datetime import datetime, timedelta
-from .schemas import FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut, ServiceUsageOut, EmployeeAttendanceCreate, EmployeeAttendanceOut, ServicePriceCreate, ServicePriceOut, MessageCreate, MessageOut
+from .schemas import (
+    FinancialReportOut, AppointmentReportOut, ChartOut, CSVExportOut, SystemReportOut,
+    ServiceUsageOut, EmployeeAttendanceCreate, EmployeeAttendanceOut,
+    ServicePriceCreate, ServicePriceOut, MessageCreate, MessageOut, PatientCommentOut, DoctorOut
+)
 from .models import EmployeeAttendance, ServicePrice, ManagerMessage
 import pdfkit
 from users.auth import AsyncAuthBearer, AuthBearer
 from patients.models import PatientComment
-from .schemas import PatientCommentOut
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
+from asgiref.sync import sync_to_async
 
 managment_router = Router(tags=["Managment & Reports"])
 
-# Generate Financial Report
+# Financial Summary
 @managment_router.get("/financial/summary", response={200: FinancialReportOut}, auth=AsyncAuthBearer())
 async def financial_summary(request, start_date: str = None, end_date: str = None):
-    """
-    Fetch financial summary: total revenue, pending vs. approved payments.
-    """
-    if not request.auth.role in ["admin", "cashier"]:
+    if request.auth.role not in ["manager", "cashier"]:
         return {"error": "Unauthorized"}
-    
+
     if not start_date:
         start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
     if not end_date:
         end_date = datetime.now().strftime("%Y-%m-%d")
-    
-    invoices = await Invoice.objects.filter(created_at__range=[start_date, end_date]).all()
+
+    invoices = await sync_to_async(list)(Invoice.objects.filter(created_at__range=[start_date, end_date]))
     total_revenue = sum(i.amount for i in invoices if i.status == "approved")
     pending_payments = sum(i.amount for i in invoices if i.status == "pending")
-    
+
     return FinancialReportOut(total_revenue=total_revenue, pending_payments=pending_payments)
 
-# Generate Appointments Report
+
+# Appointments Report
 @managment_router.get("/medical/appointments", response={200: AppointmentReportOut}, auth=AsyncAuthBearer())
 async def appointments_report(request, doctor_id: int = None):
-    """
-    Get total appointments per doctor.
-    """
-    if request.auth.role not in ["admin", "doctor"]:
+    if request.auth.role not in ["manager", "doctor"]:
         return {"error": "Unauthorized"}
-    
+
     filters = {}
     if doctor_id:
         filters["doctor_id"] = doctor_id
-    
-    appointments = await Appointment.objects.filter(**filters).all()
-    total_appointments = len(appointments)
-    return AppointmentReportOut(total_appointments=total_appointments)
 
-# Generate System-Wide Report
+    appointments = await sync_to_async(list)(Appointment.objects.filter(**filters))
+    return AppointmentReportOut(total_appointments=len(appointments))
+
+
+# System Overview
 @managment_router.get("/system/overview", response={200: SystemReportOut}, auth=AsyncAuthBearer())
 async def system_overview(request):
-    """
-    Fetch system-wide statistics: active patients, unread notifications.
-    """
-    if request.auth.role != "admin":
+    if request.auth.role != "manager":
         return {"error": "Unauthorized"}
-    
-    active_patients = await User.objects.filter(role="patient").count()
-    unread_notifications = await Notification.objects.filter(status="unread").count()
+
+    active_patients = await sync_to_async(User.objects.filter(role="patient").count)()
+    employee_count = await sync_to_async(lambda: User.objects.exclude(role__in=["patient", "manager"]).count())()
+
 
     return SystemReportOut(
         active_patients=active_patients,
-        unread_notifications=unread_notifications,
-        most_used_services=[]
+        employee_count=employee_count,
     )
 
-# Generate Most Used Services Report
-@managment_router.get("/system/most-used-services", response={200: list[ServiceUsageOut]}, auth=AsyncAuthBearer())
-async def most_used_services(request):
-    """
-    Fetch most used services in the hospital.
-    """
-    if request.auth.role != "admin":
-        return {"error": "Unauthorized"}
-
-    services = [
-        ServiceUsageOut(service_name="Appointments", count=await Appointment.objects.count()),
-        ServiceUsageOut(service_name="Lab Tests", count=await LabTest.objects.count()),
-        ServiceUsageOut(service_name="Prescriptions", count=await Prescription.objects.count()),
-    ]
-    
-    return services
-
-# Generate Chart for Most Used Services
+# Most Used Services Chart
 @managment_router.get("/system/most-used-services-chart", response={200: ChartOut}, auth=AsyncAuthBearer())
 async def most_used_services_chart(request):
-    """
-    Generate a pie chart for most used services.
-    """
     services = {
-        "Appointments": await Appointment.objects.count(),
-        "Lab Tests": await LabTest.objects.count(),
-        "Prescriptions": await Prescription.objects.count(),
+        "Appointments": await sync_to_async(Appointment.objects.count)(),
+        "Lab Tests": await sync_to_async(LabTest.objects.count)(),
+        "Prescriptions": await sync_to_async(Prescription.objects.count)(),
     }
-    
-    fig, ax = plt.subplots()
-    ax.pie(services.values(), labels=services.keys(), autopct='%1.1f%%')
-    
+
+    total = sum(services.values())
+
+    if total == 0:
+        # show an empty chart or message
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, 'No data available', ha='center', va='center')
+        ax.axis('off')
+    else:
+        fig, ax = plt.subplots()
+        ax.pie(services.values(), labels=services.keys(), autopct='%1.1f%%')
+
     buffer = io.BytesIO()
     plt.savefig(buffer, format="png")
     buffer.seek(0)
     image_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    
+
     return ChartOut(chart=f"data:image/png;base64,{image_base64}")
 
-# Export Report as CSV
+
+# Export CSV
 @managment_router.get("/export/csv", response={200: CSVExportOut}, auth=AsyncAuthBearer())
 async def export_csv(request, report_type: str):
-    """
-    Export financial or medical reports as CSV.
-    """
-    if request.auth.role != "admin":
+    if request.auth.role != "manager":
         return {"error": "Unauthorized"}
-    
+
     response = io.StringIO()
     writer = csv.writer(response)
-    
+
     if report_type == "financial":
         writer.writerow(["Date", "Amount", "Status"])
-        invoices = await Invoice.objects.all()
+        invoices = await sync_to_async(list)(Invoice.objects.all())
         for invoice in invoices:
             writer.writerow([invoice.created_at, invoice.amount, invoice.status])
-    
-    csv_data = response.getvalue()
-    return CSVExportOut(csv_file=csv_data)
 
-# Export Report as PDF
+    return CSVExportOut(csv_file=response.getvalue())
+
+
+# Export PDF
 @managment_router.get("/export/pdf", auth=AsyncAuthBearer())
 async def export_pdf(request, report_type: str):
-    """
-    Export financial or medical reports as PDF.
-    """
-    if request.auth.role != "admin":
+    if request.auth.role != "manager":
         return {"error": "Unauthorized"}
-    
-    html_content = """
+
+    html_content = f"""
     <h1>Hospital Report</h1>
-    <p>Generated on: {}</p>
-    """.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    
+    <p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+    """
+
     if report_type == "financial":
-        invoices = await Invoice.objects.all()
+        invoices = await sync_to_async(list)(Invoice.objects.all())
         html_content += "<h2>Financial Report</h2><table border='1'><tr><th>Date</th><th>Amount</th><th>Status</th></tr>"
         for invoice in invoices:
             html_content += f"<tr><td>{invoice.created_at}</td><td>{invoice.amount}</td><td>{invoice.status}</td></tr>"
         html_content += "</table>"
-    
+
     pdf_file = f"/tmp/report_{report_type}.pdf"
     pdfkit.from_string(html_content, pdf_file)
-    
+
     return {"message": "PDF generated", "file_path": pdf_file}
 
-# Notify Admin When Reports Are Generated
-async def notify_admin(report_name):
-    admin_users = await User.objects.filter(role="admin").all()
-    for admin in admin_users:
-        await send_notification(admin, f"{report_name} report has been generated.")
-
-
-# Get Patient Comments (Managers Only)
+# Patient Comments
 @managment_router.get("/patient-comments", response={200: list[PatientCommentOut]}, auth=AsyncAuthBearer())
 async def get_patient_comments(request):
-    """
-    Retrieve all patient comments (only for managers).
-    """
     if request.auth.role != "manager":
         return {"error": "Unauthorized"}
 
-    comments = await PatientComment.objects.all().order_by("-created_at")
+    comments = await sync_to_async(list)(PatientComment.objects.all().order_by("-created_at"))
     return [PatientCommentOut.model_validate(c).model_dump() for c in comments]
 
-# Employees Mark Their Own Attendance
+
+# Attendance (Sync)
 @managment_router.post("/attendance", response={200: EmployeeAttendanceOut, 400: dict}, auth=AuthBearer())
 def mark_own_attendance(request, payload: EmployeeAttendanceCreate):
     employee = request.auth
 
-    # Get today's attendance record or create it
     attendance, created = EmployeeAttendance.objects.get_or_create(employee=employee, date=now().date())
 
     if payload.action == "check_in":
@@ -215,7 +184,7 @@ def mark_own_attendance(request, payload: EmployeeAttendanceCreate):
     )
 
 
-# Managers View All Employee Attendance Records
+# Attendance List (Sync)
 @managment_router.get("/attendance", response={200: list[EmployeeAttendanceOut]}, auth=AuthBearer())
 def view_attendance(request):
     if request.auth.role != "manager":
@@ -234,12 +203,10 @@ def view_attendance(request):
         for a in EmployeeAttendance.objects.select_related("employee").all()
     ]
 
-# Add/Update Hospital Service Prices
+
+# Create Service Price
 @managment_router.post("/services", response={200: ServicePriceOut, 400: dict}, auth=AuthBearer())
 def add_service_price(request, payload: ServicePriceCreate):
-    """
-    Manager adds or updates the price of a hospital service.
-    """
     if request.auth.role != "manager":
         return 400, {"error": "Only managers can manage service prices"}
 
@@ -249,50 +216,123 @@ def add_service_price(request, payload: ServicePriceCreate):
     )
     return service
 
-# View Hospital Service Prices
+
+# Read Service Prices
 @managment_router.get("/services", response={200: list[ServicePriceOut]})
 def view_service_prices(request):
-    """
-    View all hospital service prices.
-    """
     return ServicePrice.objects.all()
 
+
+# Update Service Price
+@managment_router.put("/services/{service_id}", response={200: ServicePriceOut, 404: dict}, auth=AuthBearer())
+def update_service_price(request, service_id: int, payload: ServicePriceCreate):
+    if request.auth.role != "manager":
+        return 400, {"error": "Only managers can update service prices"}
+
+    try:
+        service = ServicePrice.objects.get(id=service_id)
+    except ServicePrice.DoesNotExist:
+        return 404, {"error": "Service not found"}
+
+    service.service_name = payload.service_name
+    service.price = payload.price
+    service.save()
+
+    return service
+
+
+# Delete Service Price
+@managment_router.delete("/services/{service_id}", response={200: dict, 404: dict}, auth=AuthBearer())
+def delete_service_price(request, service_id: int):
+    if request.auth.role != "manager":
+        return 400, {"error": "Only managers can delete service prices"}
+
+    try:
+        service = ServicePrice.objects.get(id=service_id)
+    except ServicePrice.DoesNotExist:
+        return 404, {"error": "Service not found"}
+
+    service.delete()
+    return {"success": "Service deleted successfully"}
+
+
+
+# List Employees
 @managment_router.get("/employees/", response={200: list[UserOut], 400: dict}, auth=AuthBearer())
 def list_employees(request):
-    """
-    Retrieve employees by role (e.g., doctors, pharmacists).
-    """
     if request.auth.role != "manager":
-        return 400, {"error": "Only managers can view employees"}    
+        return 400, {"error": "Only managers can view employees"}
 
-    employees = User.objects.all()
+    employees = User.objects.exclude(role__in=["manager", "patient"])
     return 200, employees
 
-# Send Message from Manager to Employee
+
+# Send Message
 @managment_router.post("/send", response={200: MessageOut, 400: dict}, auth=AuthBearer())
 def send_message(request, payload: MessageCreate):
-    """
-    Manager sends a message to an employee.
-    """
     sender = request.auth
     if sender.role != "manager":
         return 400, {"error": "Only managers can send messages"}
 
     receiver = get_object_or_404(User, id=payload.receiver_id)
 
+    # Create the message with the sender and receiver usernames (strings)
     message = ManagerMessage.objects.create(
-        sender=sender,
-        receiver=receiver,
+        sender=sender,  # sender is the actual User instance
+        receiver=receiver,  # receiver is the actual User instance
         subject=payload.subject,
         message=payload.message,
     )
-    return message
 
+    # Return the message using the MessageOut schema
+    return {
+        "id": message.id,
+        "sender": message.sender.username,  
+        "receiver": message.receiver.username,
+        "subject": message.subject,
+        "message": message.message,
+        "timestamp": message.timestamp,
+        "is_read": message.is_read,
+    }
 
-# List Messages for Employee
+# Inbox
 @managment_router.get("/inbox", response={200: list[MessageOut]}, auth=AuthBearer())
 def list_received_messages(request):
-    """
-    Retrieve all messages received by the logged-in user.
-    """
-    return ManagerMessage.objects.filter(receiver=request.auth).order_by("-timestamp")
+    messages = ManagerMessage.objects.filter(receiver=request.auth).order_by("-timestamp")
+    print(messages)  # Debugging step: Check if any messages are returned
+    return [
+        {
+            "id": message.id,
+            "sender": message.sender.username,
+            "receiver": message.receiver.username,
+            "subject": message.subject,
+            "message": message.message,
+            "timestamp": message.timestamp,
+            "is_read": message.is_read,
+        }
+        for message in messages
+    ]
+
+
+# List Doctor Employees
+@managment_router.get("/employees/doctors/", response={200: list[DoctorOut], 400: dict}, auth=AuthBearer())
+def list_doctor_employees(request):
+    if not request.auth:
+        print(request)
+        return 400, {"error": "Unauthorized"}
+
+    doctors = User.objects.filter(role="doctor")
+    doctor_profiles = DoctorProfile.objects.filter(user__in=doctors).select_related("user")
+
+    doctor_data = [
+        DoctorOut(
+            id=profile.user.id,
+            first_name=profile.user.first_name,
+            last_name=profile.user.last_name,
+            department=profile.department,
+            level=profile.level
+        )
+        for profile in doctor_profiles
+    ]
+
+    return 200, doctor_data

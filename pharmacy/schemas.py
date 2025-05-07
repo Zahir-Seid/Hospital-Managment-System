@@ -11,6 +11,7 @@ class PrescriptionCreate(BaseModel):
 
 class PrescriptionUpdate(BaseModel):
     status: Optional[str] = None
+    price: Optional[float] = None
 
 class PrescriptionOut(BaseModel):
     id: int
@@ -22,6 +23,7 @@ class PrescriptionOut(BaseModel):
     status: str
     prescribed_at: datetime
     updated_at: datetime
+    price: Optional[float] = None
 
     class Config:
         from_attributes = True

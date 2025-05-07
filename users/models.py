@@ -3,7 +3,7 @@ from django.db import models
 
 # Custom User Model
 class User(AbstractUser):
-    ROLES = [
+    ROLES = [ 
         ('manager', 'Manager'),
         ('doctor', 'Doctor'),
         ('patient', 'Patient'),
@@ -20,6 +20,7 @@ class User(AbstractUser):
     date_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
+    ssn = models.CharField(max_length=20, unique=True) # for employees can be used for patients as well
     profile_picture = models.ImageField(
         upload_to='profile_pictures/', 
         blank=True, 
@@ -30,41 +31,7 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
-
-# Base Profile Model for Common Fields
-class BaseProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='%(class)s_profile')
-    ssn = models.CharField(max_length=20, unique=True)
-
-    class Meta:
-        abstract = True
-
-
-# Role-specific Profiles
-class ManagerProfile(BaseProfile):
-    pass
-
-
-class DoctorProfile(BaseProfile):
-    department = models.CharField(max_length=50, blank=True, null=True)
-    level = models.CharField(max_length=20, blank=True, null=True)
-
-
-class PharmacistProfile(BaseProfile):
-    pass
-
-
-class LabTechnicianProfile(BaseProfile):
-    pass
-
-
-class CashierProfile(BaseProfile):
-    pass
-
-class RecordOfficerProfile(BaseProfile):
-    pass
-
-# Patient Profile (Separate as it doesn’t need SSN)
+# Patient Profile
 class PatientProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="patient_profile")
     region = models.CharField(max_length=50, blank=True, null=True)
@@ -73,3 +40,7 @@ class PatientProfile(models.Model):
     house_number = models.CharField(max_length=50, blank=True, null=True)
     room_number = models.CharField(max_length=10, blank=True, null=True, unique=True)
 
+class DoctorProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="Doctor_profile")
+    department = models.CharField(max_length=50, blank=True, null=True)
+    level = models.CharField(max_length=20, blank=True, null=True)

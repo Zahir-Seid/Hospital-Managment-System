@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from typing import Optional
 from datetime import datetime
+from users.models import User
 
 class InvoiceCreate(BaseModel):
     patient_id: int
@@ -8,7 +9,10 @@ class InvoiceCreate(BaseModel):
     description: str
 
 class InvoiceUpdate(BaseModel):
-    status: Optional[str] = None
+    amount: float
+
+    class Config:
+        from_attributes = True
 
 class InvoiceOut(BaseModel):
     id: int
@@ -22,3 +26,5 @@ class InvoiceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+

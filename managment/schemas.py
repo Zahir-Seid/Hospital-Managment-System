@@ -27,8 +27,7 @@ class ChartOut(BaseModel):
 # System Report Schema
 class SystemReportOut(BaseModel):
     active_patients: int
-    most_used_services: List[ServiceUsageOut]
-    unread_notifications: int
+    employee_count: int
 
 # Patient Comment Schema
 class PatientCommentOut(BaseModel):
@@ -88,3 +87,10 @@ class MessageOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class DoctorOut(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    department: str | None = None
+    level: str | None = None

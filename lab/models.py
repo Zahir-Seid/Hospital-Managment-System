@@ -4,7 +4,6 @@ from users.models import User
 class LabTest(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
-        ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
     ]
 
@@ -18,3 +17,15 @@ class LabTest(models.Model):
 
     def __str__(self):
         return f"Test: {self.test_name} | Patient: {self.patient.username} | Status: {self.status}"
+
+
+class StaffMessage(models.Model):
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="staff_sent_messages")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="staff_received_messages")
+    subject = models.CharField(max_length=255, blank=True, null=True)
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Message from {self.sender.username} to {self.receiver.username}"
